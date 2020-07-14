@@ -1,40 +1,50 @@
 use std::io::{stdout, Write, Stdout};
-use crossterm::{ExecutableCommand, terminal, cursor, style, Result};
+use crossterm::{ExecutableCommand, terminal, cursor, style, Result, QueueableCommand};
 use std::fmt::Display;
 use crossterm::style::{StyledContent, ContentStyle};
 
 pub trait TerminalPixel {
-    type Symbol: Display + Copy;
-    fn symbol(&self) -> Self::Symbol;
+    fn char(&self) -> char;
 }
 
-type TerminalMatrix<P> where P: TerminalPixel = Vec<Vec<P>>;
+type TerminalMatrix<P> = Vec<Vec<P>>;
 
 pub struct Terminal {
-    stdout: Stdout
+    stdout: Stdout,
+    matrix_cache: TerminalMatrix<char>
 }
 
 impl Terminal {
     pub fn new() -> Self {
-        Terminal { stdout: stdout() }
+        Terminal {
+            stdout: stdout(),
+            matrix_cache: vec![]
+        }
     }
     pub fn render(&mut self, matrix: &TerminalMatrix<impl TerminalPixel>) -> Result<()> {
-        self.stdout.execute(terminal::Clear(
-            terminal::ClearType::All
-        ))?;
+        let cached_matrix = self.matrix_cache.clone();
+        self.matrix_cache = vec![];
         for (i, row) in matrix.iter().enumerate() {
+            self.matrix_cache.push(vec![]);
             for (j, element) in row.iter().enumerate() {
+                let pixel_char = element.char();
+                self.matrix_cache[i].push(pixel_char);
+                if i < cached_matrix.len() {
+                    if j < cached_matrix[i].len() && pixel_char == cached_matrix[i][j] {
+                        continue
+                    }
+                }
                 self.stdout
-                    .execute(cursor::MoveTo(
+                    .queue(cursor::MoveTo(
                         i as u16,
                         j as u16
                     ))?
-                    .execute(style::PrintStyledContent(
-                        StyledContent::new(ContentStyle::new(), element.symbol())
+                    .queue(style::PrintStyledContent(
+                        StyledContent::new(ContentStyle::new(), pixel_char)
                     ))?;
             }
         }
-        self.stdout.execute(cursor::MoveTo(
+        self.stdout.queue(cursor::MoveTo(
             0,
             0
         ))?;
@@ -42,35 +52,3 @@ impl Terminal {
         Ok(())
     }
 }
-
-/*fn start_controls_listener(
-    stop_key_code: KeyCode,
-    key_code_arc: &Arc<Mutex<KeyCode>>
-) -> JoinHandle<Result<()>> {
-    let key_code_arc = Arc::clone(&key_code_arc);
-    thread::spawn(move || {
-        match enable_raw_mode() {
-            Ok(_) => {},
-            Err(err) => return Err(err)
-        }
-        loop {
-            match read() {
-                Ok(event) => match event {
-                    Event::Key(event) => {
-                        if let Ok(mut key_code_mutex) = key_code_arc.lock() {
-                            let event_key_code = event.code;
-                            *key_code_mutex = event_key_code;
-                        }
-                    },
-                    _ => {}
-                },
-                Err(err) => return Err(err)
-            }
-        }
-        match disable_raw_mode() {
-            Ok(_) => {},
-            Err(err) => return Err(err)
-        }
-        Ok(())
-    })
-}*/

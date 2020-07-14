@@ -26,9 +26,7 @@ impl Clone for PointType {
 }
 
 impl TerminalPixel for PointType {
-    type Symbol = char;
-
-    fn symbol(&self) -> Self::Symbol {
+    fn char(&self) -> char {
         match self {
             PointType::Border => '#',
             PointType::Body => 'o',
@@ -55,7 +53,6 @@ impl SnakeGame {
         let border_points = {
             let mut border_points: Vec<Point<u16>> = Vec::new();
             for i in 0..map_size.0 {
-                let mut row: Vec<PointType> = Vec::new();
                 for j in 0..map_size.1 {
                     if i == 0 || j == 0 || i == map_size.0 - 1 || j == map_size.1 - 1 {
                         border_points.push(Point::new(i, j));
