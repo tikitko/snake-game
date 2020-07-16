@@ -12,7 +12,7 @@ impl<N> PointNode<N> where N: Add<Output = N> + Sub<Output = N> + Copy + Partial
         if let Some(next_node) = self.get_next_node().as_mut() {
             next_node.recursive_move_chain_to(current_point, add_node_to_end)
         } else if add_node_to_end {
-            self.set_next_node(Box::new(PointNode::new(current_point)))
+            self.set_next_node(Some(Box::new(PointNode::new(current_point))))
         }
     }
     fn x(&self) -> N {

@@ -7,9 +7,8 @@ mod point;
 
 extern crate crossterm;
 
-use crossterm::{Result, ErrorKind};
+use crossterm::Result;
 use crossterm::event::{read, Event, KeyCode, poll};
-use crossterm::style::{Colorize};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::time::Duration;
 use std::thread;
@@ -17,16 +16,20 @@ use std::thread;
 
 fn main() -> Result<()> {
     let mut snake_game = snake_game::SnakeGame::new((50, 20));
-    enable_raw_mode();
+    enable_raw_mode()?;
     loop {
         let current_key_code = match current_key_code() {
             Ok(key_code) => key_code,
             Err(_) => KeyCode::Null,
         };
+        if current_key_code == KeyCode::Char('q') {
+            break
+        }
         snake_game.tick(current_key_code);
         thread::sleep(Duration::from_millis(100));
     }
-    disable_raw_mode()
+    disable_raw_mode()?;
+    Ok(())
 }
 
 fn current_key_code() -> Result<KeyCode> {

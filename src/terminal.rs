@@ -1,6 +1,5 @@
 use std::io::{stdout, Write, Stdout};
-use crossterm::{ExecutableCommand, terminal, cursor, style, Result, QueueableCommand};
-use std::fmt::Display;
+use crossterm::{cursor, style, Result, QueueableCommand};
 use crossterm::style::{StyledContent, ContentStyle};
 
 pub trait TerminalPixel {

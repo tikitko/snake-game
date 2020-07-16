@@ -16,11 +16,8 @@ impl<V> Node<V> where V: Copy {
     pub fn get_next_node(&mut self) -> Option<&mut Box<Node<V>>> {
         self.next_node.as_mut()
     }
-    pub fn set_next_node(&mut self, next_node: Box<Node<V>>) {
-        self.next_node = Some(next_node)
-    }
-    pub fn remove_next_node(&mut self) {
-        self.next_node = None
+    pub fn set_next_node(&mut self, next_node: Option<Box<Node<V>>>) {
+        self.next_node = next_node
     }
     pub fn all_nodes_values(&self) -> Vec<V> {
         match self.next_node.as_ref() {

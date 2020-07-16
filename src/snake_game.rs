@@ -6,7 +6,7 @@ use terminal::{Terminal, TerminalPixel};
 use point::Point;
 
 use crossterm::event::KeyCode;
-use std::fmt::Display;
+
 use rand::Rng;
 use rand::rngs::ThreadRng;
 
