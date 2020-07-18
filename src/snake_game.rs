@@ -62,16 +62,16 @@ pub struct SnakeGame {
 impl SnakeGame {
     pub fn try_create(config: SnakeGameConfig) -> Result<Self, SnakeGameCreateError> {
         if config.world_size.0 < 10 && config.world_size.1 < 10 {
-            Err(SnakeGameCreateError::WorldSmall)
+            return Err(SnakeGameCreateError::WorldSmall)
         }
         if config.world_size.0 > 100 && config.world_size.1 > 100 {
-            Err(SnakeGameCreateError::WorldLarge)
+            return Err(SnakeGameCreateError::WorldLarge)
         }
         if config.eat_count < 1 {
-            Err(SnakeGameCreateError::FoodLack)
+            return Err(SnakeGameCreateError::FoodLack)
         }
         if config.eat_count > 10 {
-            Err(SnakeGameCreateError::FoodExcess)
+            return Err(SnakeGameCreateError::FoodExcess)
         }
         Ok(SnakeGame {
             world: World::new(),
@@ -218,7 +218,7 @@ impl SnakeGame {
             let points = HashSet::from_iter(snake_info.snake.body_parts_points(true).clone());
             self.world.set_layer(ObjectType::Snake(snake_number.clone()), points)
         }
-        let eat_to_spawn = self.config.eat_count - self.eat_points.len();
+        let eat_to_spawn = self.config.eat_count - self.eat_points.len() as u16;
         for _ in 0..eat_to_spawn {
             loop {
                 let x = self.rng.gen_range(1, self.config.world_size.0 - 1);
