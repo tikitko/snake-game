@@ -1,11 +1,17 @@
 use std::io::{stdout, Write, Stdout};
-use crossterm::{cursor, style, Result, QueueableCommand};
-use crossterm::style::{StyledContent, ContentStyle};
 use std::collections::HashMap;
+use std::time::Duration;
+use crossterm::{cursor, style, QueueableCommand, terminal};
+use crossterm::style::{StyledContent, ContentStyle};
+use crossterm::event::{read, Event, poll};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+
 use crate::point::Point;
 
-type TerminalPoints<P> = HashMap<Point<u16>, P>;
-type TerminalMatrix<P> = Vec<Vec<P>>;
+pub type TerminalPoints<P> = HashMap<Point<u16>, P>;
+pub type TerminalMatrix<P> = Vec<Vec<P>>;
+pub type KeyCode = crossterm::event::KeyCode;
+pub type ErrorKind = crossterm::ErrorKind;
 
 pub trait TerminalPixel {
     fn char(&self) -> char;
@@ -13,7 +19,7 @@ pub trait TerminalPixel {
 
 pub struct Terminal {
     stdout: Stdout,
-    cache: HashMap<Point<u16>, char>
+    cache: HashMap<Point<u16>, char>,
 }
 
 impl Terminal {
@@ -21,14 +27,36 @@ impl Terminal {
     pub fn new() -> Self {
         Terminal {
             stdout: stdout(),
-            cache: HashMap::new()
+            cache: HashMap::new(),
         }
     }
-    pub fn render_points(&mut self, points: &TerminalPoints<impl TerminalPixel>) -> Result<()> {
+    pub fn enable_raw_mode() -> Result<(), ErrorKind> {
+        enable_raw_mode()
+    }
+    pub fn disable_raw_mode() -> Result<(), ErrorKind> {
+        disable_raw_mode()
+    }
+    pub fn current_key_code(wait_for_duration: Duration) -> Result<KeyCode, ErrorKind> {
+        if poll(wait_for_duration)? {
+            return match read()? {
+                Event::Key(key_event) => Ok(key_event.code),
+                _ => Ok(KeyCode::Null)
+            };
+        } else {
+            Ok(KeyCode::Null)
+        }
+    }
+    pub fn clear(&mut self) -> Result<(), ErrorKind> {
+        self.stdout.queue(terminal::Clear(terminal::ClearType::All))?;
+        Ok(())
+    }
+    pub fn render_points<P>(&mut self, points: &TerminalPoints<P>) -> Result<(), ErrorKind> where
+        P: TerminalPixel {
         let mut previous_cache = self.cache.clone();
         self.cache = HashMap::new();
         for (point, pixel) in points {
             let char = pixel.char();
+            self.cache.insert(point.clone(), char);
             if let Some(previous_char) = previous_cache.get(point) {
                 if *previous_char == char {
                     previous_cache.remove(point);
@@ -37,7 +65,7 @@ impl Terminal {
             self.stdout
                 .queue(cursor::MoveTo(
                     point.x(),
-                    point.y()
+                    point.y(),
                 ))?
                 .queue(style::PrintStyledContent(
                     StyledContent::new(ContentStyle::new(), char)
@@ -47,7 +75,7 @@ impl Terminal {
             self.stdout
                 .queue(cursor::MoveTo(
                     point.x(),
-                    point.y()
+                    point.y(),
                 ))?
                 .queue(style::PrintStyledContent(
                     StyledContent::new(ContentStyle::new(), Self::SPACE_CHAR)
@@ -55,12 +83,13 @@ impl Terminal {
         }
         self.stdout.queue(cursor::MoveTo(
             0,
-            0
+            0,
         ))?;
         self.stdout.flush()?;
         Ok(())
     }
-    pub fn render_matrix(&mut self, matrix: &TerminalMatrix<impl TerminalPixel>) -> Result<()> {
+    pub fn render_matrix<P>(&mut self, matrix: &TerminalMatrix<P>) -> Result<(), ErrorKind> where
+        P: TerminalPixel {
         let previous_cache = self.cache.clone();
         self.cache = HashMap::new();
         for (i, row) in matrix.iter().enumerate() {
@@ -72,13 +101,13 @@ impl Terminal {
                 }
                 if let Some(previous_char) = previous_cache.get(&point) {
                     if *previous_char == char {
-                        continue
+                        continue;
                     }
                 }
                 self.stdout
                     .queue(cursor::MoveTo(
                         point.x(),
-                        point.y()
+                        point.y(),
                     ))?
                     .queue(style::PrintStyledContent(
                         StyledContent::new(ContentStyle::new(), char)
@@ -87,7 +116,7 @@ impl Terminal {
         }
         self.stdout.queue(cursor::MoveTo(
             0,
-            0
+            0,
         ))?;
         self.stdout.flush()?;
         Ok(())
