@@ -133,6 +133,6 @@ impl SnakeGame {
             let y_index = snake_point.y() as usize;
             tick_world_map[x_index][y_index] = PointType::Body;
         }
-        let _ = self.terminal.render(&tick_world_map);
+        let _ = self.terminal.render_matrix(&tick_world_map);
     }
 }

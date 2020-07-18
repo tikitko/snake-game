@@ -4,8 +4,9 @@ use super::point_node;
 use std::ops::{Add, Sub};
 use point::Point;
 use point_node::PointNode;
+use std::hash::Hash;
 
-impl<N> PointNode<N> where N: Add<Output = N> + Sub<Output = N> + Copy + PartialEq {
+impl<N> PointNode<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     fn recursive_move_chain_to(&mut self, point: Point<N>, add_node_to_end: bool) {
         let current_point = self.get_value();
         self.set_value(point);
@@ -38,12 +39,12 @@ impl Clone for MoveDirection {
     }
 }
 
-pub struct Snake<N> where N: Add<Output = N> + Sub<Output = N> + Copy + PartialEq {
+pub struct Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     head_point_node: Box<PointNode<N>>,
     is_stomach_not_empty: bool
 }
 
-impl<N> Snake<N> where N: Add<Output = N> + Sub<Output = N> + Copy + PartialEq {
+impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn make_on(point: Point<N>) -> Self {
         Snake { head_point_node: Box::new(PointNode::new(point)), is_stomach_not_empty: false }
     }
@@ -58,7 +59,7 @@ impl<N> Snake<N> where N: Add<Output = N> + Sub<Output = N> + Copy + PartialEq {
     }
 }
 
-impl<N> Snake<N> where N: Add<Output = N> + Sub<Output = N> + Copy + PartialEq + From<u8> {
+impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + From<u8> {
     pub fn move_to(&mut self, move_direction: MoveDirection) {
         let mut x = self.head_point_node.x();
         let mut y = self.head_point_node.y();

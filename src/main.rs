@@ -1,3 +1,4 @@
+mod world;
 mod snake_game;
 mod terminal;
 mod snake;
