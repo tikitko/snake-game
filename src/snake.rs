@@ -35,7 +35,7 @@ impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn make_on(point: Point<N>) -> Self {
         Snake {
             head_point_node: Box::new(Node::new(point)),
-            is_stomach_not_empty: false
+            is_stomach_not_empty: false,
         }
     }
     pub fn body_parts_points(&self, include_head: bool) -> Vec<Point<N>> {
