@@ -12,6 +12,7 @@ pub type TerminalPoints<P> = HashMap<Point<u16>, P>;
 pub type TerminalMatrix<P> = Vec<Vec<P>>;
 pub type KeyCode = crossterm::event::KeyCode;
 pub type ErrorKind = crossterm::ErrorKind;
+pub type Result<S> = crossterm::Result<S>;
 
 pub trait TerminalPixel {
     fn char(&self) -> char;
@@ -30,13 +31,13 @@ impl Terminal {
             cache: HashMap::new(),
         }
     }
-    pub fn enable_raw_mode() -> Result<(), ErrorKind> {
+    pub fn enable_raw_mode() -> Result<()> {
         enable_raw_mode()
     }
-    pub fn disable_raw_mode() -> Result<(), ErrorKind> {
+    pub fn disable_raw_mode() -> Result<()> {
         disable_raw_mode()
     }
-    pub fn current_key_code(wait_for_duration: Duration) -> Result<KeyCode, ErrorKind> {
+    pub fn current_key_code(wait_for_duration: Duration) -> Result<KeyCode> {
         if poll(wait_for_duration)? {
             return match read()? {
                 Event::Key(key_event) => Ok(key_event.code),
@@ -46,11 +47,11 @@ impl Terminal {
             Ok(KeyCode::Null)
         }
     }
-    pub fn clear(&mut self) -> Result<(), ErrorKind> {
+    pub fn clear(&mut self) -> Result<()> {
         self.stdout.queue(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
-    pub fn render_points<P>(&mut self, points: &TerminalPoints<P>) -> Result<(), ErrorKind> where
+    pub fn render_points<P>(&mut self, points: &TerminalPoints<P>) -> Result<()> where
         P: TerminalPixel {
         let mut previous_cache = self.cache.clone();
         self.cache = HashMap::new();
@@ -58,8 +59,10 @@ impl Terminal {
             let char = pixel.char();
             self.cache.insert(point.clone(), char);
             if let Some(previous_char) = previous_cache.get(point) {
-                if *previous_char == char {
-                    previous_cache.remove(point);
+                let should_skip_render = *previous_char == char;
+                previous_cache.remove(point);
+                if should_skip_render {
+                    continue;
                 }
             }
             self.stdout
@@ -88,7 +91,7 @@ impl Terminal {
         self.stdout.flush()?;
         Ok(())
     }
-    pub fn render_matrix<P>(&mut self, matrix: &TerminalMatrix<P>) -> Result<(), ErrorKind> where
+    pub fn render_matrix<P>(&mut self, matrix: &TerminalMatrix<P>) -> Result<()> where
         P: TerminalPixel {
         let previous_cache = self.cache.clone();
         self.cache = HashMap::new();

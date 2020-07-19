@@ -1,7 +1,7 @@
 use std::hash::Hash;
 
 pub struct Node<V>
-    where V: Copy {
+    where V: Copy + Hash + Eq {
     value: V,
     next_node: Option<Box<Node<V>>>,
 }

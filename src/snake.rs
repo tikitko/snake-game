@@ -1,19 +1,21 @@
 use super::point;
-use super::point_node;
+use super::node;
+use super::direction;
 
-use std::ops::{Add, Sub};
 use point::Point;
-use point_node::PointNode;
+use node::Node;
+use direction::Direction;
+use std::ops::{Add, Sub};
 use std::hash::Hash;
 
-impl<N> PointNode<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+impl<N> Node<Point<N>> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     fn recursive_move_chain_to(&mut self, point: Point<N>, add_node_to_end: bool) {
         let current_point = self.get_value();
         self.set_value(point);
         if let Some(next_node) = self.get_next_node_mut() {
             next_node.recursive_move_chain_to(current_point, add_node_to_end)
         } else if add_node_to_end {
-            self.set_next_node(Some(Box::new(PointNode::new(current_point))))
+            self.set_next_node(Some(Box::new(Self::new(current_point))))
         }
     }
     fn x(&self) -> N {
@@ -24,33 +26,17 @@ impl<N> PointNode<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     }
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum MoveDirection {
-    Right,
-    Left,
-    Down,
-    Up,
-}
-
-impl MoveDirection {
-    pub fn reverse(&self) -> MoveDirection {
-        match self {
-            MoveDirection::Right => MoveDirection::Left,
-            MoveDirection::Left => MoveDirection::Right,
-            MoveDirection::Down => MoveDirection::Up,
-            MoveDirection::Up => MoveDirection::Down,
-        }
-    }
-}
-
 pub struct Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
-    head_point_node: Box<PointNode<N>>,
+    head_point_node: Box<Node<Point<N>>>,
     is_stomach_not_empty: bool,
 }
 
 impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn make_on(point: Point<N>) -> Self {
-        Snake { head_point_node: Box::new(PointNode::new(point)), is_stomach_not_empty: false }
+        Snake {
+            head_point_node: Box::new(Node::new(point)),
+            is_stomach_not_empty: false
+        }
     }
     pub fn body_parts_points(&self, include_head: bool) -> Vec<Point<N>> {
         if include_head {
@@ -71,19 +57,19 @@ impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
 }
 
 impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + From<u8> {
-    pub fn next_head_point(&self, move_direction: MoveDirection) -> Point<N> {
+    pub fn next_head_point(&self, move_direction: Direction) -> Point<N> {
         let mut x = self.head_point_node.x();
         let mut y = self.head_point_node.y();
         let step_value = N::from(1);
         match move_direction {
-            MoveDirection::Right => x = x.add(step_value),
-            MoveDirection::Left => x = x.sub(step_value),
-            MoveDirection::Down => y = y.add(step_value),
-            MoveDirection::Up => y = y.sub(step_value)
+            Direction::Right => x = x.add(step_value),
+            Direction::Left => x = x.sub(step_value),
+            Direction::Down => y = y.add(step_value),
+            Direction::Up => y = y.sub(step_value)
         }
         Point::new(x, y)
     }
-    pub fn move_to(&mut self, move_direction: MoveDirection) {
+    pub fn move_to(&mut self, move_direction: Direction) {
         let is_body_increased = self.is_stomach_not_empty;
         self.is_stomach_not_empty = false;
         let next_head_point = self.next_head_point(move_direction);
