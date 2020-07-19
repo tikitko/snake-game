@@ -72,10 +72,10 @@ pub struct SnakeGame {
 
 impl SnakeGame {
     pub fn try_create(config: Config) -> Result<Self, CreateError> {
-        if config.world_size.0 < 10 && config.world_size.1 < 10 {
+        if config.world_size.0 < 10 || config.world_size.1 < 10 {
             return Err(CreateError::WorldSmall);
         }
-        if config.world_size.0 > 100 && config.world_size.1 > 100 {
+        if config.world_size.0 > 100 || config.world_size.1 > 100 {
             return Err(CreateError::WorldLarge);
         }
         if config.eat_count < 1 {
@@ -87,7 +87,7 @@ impl SnakeGame {
         if config.players_count < 1 {
             return Err(CreateError::TooFewPlayers);
         }
-        if config.players_count > 10 && config.world_size.1 >= config.players_count * 3 {
+        if config.players_count > 10 || config.world_size.1 <= (config.players_count + 1) * 3 {
             return Err(CreateError::TooManyPlayers);
         }
         Ok(SnakeGame {
@@ -123,8 +123,13 @@ impl SnakeGame {
                 let mut snakes = HashMap::new();
                 for snake_number in 0..self.config.players_count {
                     let real_snake_number = snake_number + 1;
+                    let mut snake = Snake::make_on(Point::new(3, real_snake_number * 3));
+                    for _ in 0..3 {
+                        snake.fill_stomach_if_empty();
+                        snake.move_to(Direction::Right)
+                    }
                     snakes.insert(snake_number as usize, SnakeInfo {
-                        snake: Snake::make_on(Point::new(6, real_snake_number * 3)),
+                        snake,
                         direction: None,
                     });
                 }
