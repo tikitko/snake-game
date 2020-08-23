@@ -14,19 +14,28 @@ use rand::rngs::ThreadRng;
 use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
 use std::hash::Hash;
-use crate::snake_world::{SnakeWorldConfig, SnakeWorldView, SnakeWorldSnakeController, SnakeWorldObjectType};
+use crate::snake_world::{SnakeWorldConfig, SnakeWorldWorldView, SnakeWorldSnakeController, SnakeWorldObjectType};
 use std::cell::RefCell;
+use std::rc::Rc;
 
 type Config = SnakeGameConfig;
 type CreateError = SnakeGameCreateError;
+type ActionType = SnakeGameActionType;
 type TickType = SnakeGameTickType;
-type Controller = dyn SnakeGameController;
+type GameController = dyn SnakeGameGameController;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct SnakeGameConfig {}
+pub struct SnakeGameConfig {
+    pub game_controller: Box<RefCell<GameController>>
+}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SnakeGameCreateError {}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum SnakeGameActionType {
+    Start,
+    Exit,
+}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SnakeGameTickType {
@@ -34,32 +43,50 @@ pub enum SnakeGameTickType {
     EndGame,
 }
 
-pub trait SnakeGameController {
-    fn game_start(&mut self) -> HashMap<usize, RefCell<&mut dyn SnakeWorldSnakeController>>;
-    fn game_tick(&mut self, world_view: &SnakeWorldView) -> TickType;
+pub trait SnakeGameGameController {
+    fn game_action(&mut self) -> ActionType;
+    fn game_world_config(&mut self) -> SnakeWorldConfig;
+    fn game_world_create_state(&mut self, state: Result<(), SnakeWorldCreateError>);
+    fn game_start(&mut self);
+    fn game_tick(&mut self, world_view: SnakeWorldWorldView) -> TickType;
     fn game_map_update(&mut self, map: HashMap<Point<u16>, SnakeWorldObjectType>);
     fn game_end(&mut self);
 }
 
 pub struct SnakeGame {
     config: Config,
-    world: SnakeWorld,
 }
 
 impl SnakeGame {
-    pub fn try_create(config: Config, world: SnakeWorld) -> Result<Self, CreateError> {
+    pub fn try_create(config: Config) -> Result<Self, CreateError> {
         Ok(SnakeGame {
-            config,
-            world,
+            config
         })
     }
-    pub fn game_start(&mut self, controller: Box<&mut Controller>) {
-        let snake_controllers = controller.game_start();
+    pub fn start(&mut self) {
         loop {
-            controller.game_tick(&self.world.get_view());
-            self.world.tick(snake_controllers);
-            controller.game_map_update(self.world.generate_map());
+            match self.config.game_controller.borrow_mut().game_action() {
+                SnakeGameActionType::Start => {},
+                SnakeGameActionType::Exit => break,
+            }
+
+            let world_config = self.config.game_controller.borrow_mut().game_world_config();
+            match SnakeWorld::try_create(world_config) {
+                Ok(mut world) => {
+                    self.config.game_controller.borrow_mut().game_world_create_state(Ok(()));
+
+                    self.config.game_controller.borrow_mut().game_start();
+                    loop {
+                        self.config.game_controller.borrow_mut().game_tick(world.get_world_view());
+                        world.tick();
+                        self.config.game_controller.borrow_mut().game_map_update(world.generate_map());
+                    }
+                    self.config.game_controller.borrow_mut().game_end();
+                }
+                Err(err) => {
+                    self.config.game_controller.borrow_mut().game_world_create_state(Err(err));
+                }
+            }
         }
-        controller.game_end();
     }
 }

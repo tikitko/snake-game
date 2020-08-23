@@ -12,20 +12,22 @@ use rand::rngs::ThreadRng;
 use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
 use std::hash::Hash;
+use std::cell::RefCell;
+use std::borrow::{BorrowMut, Borrow};
+use std::rc::Rc;
 
 type NumberSize = u16;
 type Config = SnakeWorldConfig;
 type CreateError = SnakeWorldCreateError;
 type ObjectType = SnakeWorldObjectType;
 type SnakeInfo = SnakeWorldSnakeInfo;
-type View<'a> = SnakeWorldView<'a>;
+type WorldView = SnakeWorldWorldView;
 type SnakeController = dyn SnakeWorldSnakeController;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct SnakeWorldConfig {
     pub world_size: (NumberSize, NumberSize),
     pub eat_count: NumberSize,
-    pub snakes_count: NumberSize,
+    pub snakes_controllers: HashMap<usize, Box<RefCell<SnakeController>>>
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -50,14 +52,14 @@ pub struct SnakeWorldSnakeInfo {
     pub direction: Option<Direction>,
 }
 
-pub struct SnakeWorldView<'a> {
-    world: &'a World<ObjectType, NumberSize>,
+pub struct SnakeWorldWorldView {
+    world: World<ObjectType, NumberSize>
 }
 
 pub trait SnakeWorldSnakeController {
-    fn snake_burn(&mut self, self_info: &SnakeInfo, world_view: &View);
-    fn snake_move(&mut self, self_info: &SnakeInfo, world_view: &View) -> Direction;
-    fn snake_died(&mut self, self_info: &SnakeInfo, world_view: &View);
+    fn snake_burn(&mut self, self_info: &SnakeInfo, world_view: &WorldView);
+    fn snake_move(&mut self, self_info: &SnakeInfo, world_view: &WorldView) -> Direction;
+    fn snake_died(&mut self, self_info: &SnakeInfo, world_view: &WorldView);
 }
 
 pub struct SnakeWorld {
@@ -83,10 +85,10 @@ impl SnakeWorld {
         if config.eat_count > 10 {
             return Err(CreateError::FoodExcess);
         }
-        if config.snakes_count < 1 {
+        if config.snakes_controllers.len() < 1 {
             return Err(CreateError::TooFewControllers);
         }
-        if config.snakes_count > 10 || config.world_size.1 <= (config.snakes_count + 1) * 3 {
+        if config.snakes_controllers.len() > 10 || config.world_size.1 <= ((config.snakes_controllers.len() + 1) * 3) as u16 {
             return Err(CreateError::TooManyControllers);
         }
         Ok(SnakeWorld {
@@ -98,7 +100,10 @@ impl SnakeWorld {
             rng: rand::thread_rng(),
         })
     }
-    pub fn tick(&mut self, snakes_controllers: HashMap<usize, Box<&mut SnakeController>>) {
+    pub fn tick(&mut self) {
+        let world_view = WorldView {
+            world: self.world.clone()
+        };
         // Border
         if self.border_points.len() == 0 {
             self.border_points = {
@@ -120,7 +125,7 @@ impl SnakeWorld {
         if self.snakes_info.len() == 0 {
             self.snakes_info = {
                 let mut snakes = HashMap::new();
-                for snake_number in 0..self.config.snakes_count {
+                for snake_number in 0..self.config.snakes_controllers.len() as u16 {
                     let real_snake_number = snake_number + 1;
                     let snake_number = snake_number as usize;
                     let mut snake = Snake::make_on(Point::new(3, real_snake_number * 3));
@@ -132,9 +137,9 @@ impl SnakeWorld {
                         snake,
                         direction: None,
                     };
-                    let controller = snakes_controllers.get(&snake_number);
+                    let controller = self.config.snakes_controllers.get(&snake_number);
                     if let Some(controller) = controller {
-                        controller.snake_burn(&snake_info, &self.get_view());
+                        controller.as_ref().borrow_mut().snake_burn(&snake_info, &world_view);
                     }
                     snakes.insert(snake_number, snake_info);
                 }
@@ -143,9 +148,9 @@ impl SnakeWorld {
         }
         let mut snakes_move_vectors = HashMap::new();
         for (snake_number, snake_info) in &mut self.snakes_info {
-            let controller = snakes_controllers.get(snake_number);
-            if let Some(controller) = controller {
-                let controller_direction = (**controller).snake_move(snake_info, &self.get_view());
+            let controller = self.config.snakes_controllers.get(snake_number);
+            if let Some(mut controller) = controller {
+                let controller_direction = controller.as_ref().borrow_mut().snake_move(snake_info, &world_view);
                 if let Some(snake_direction) = snake_info.direction {
                     if controller_direction.reverse() != snake_direction {
                         snake_info.direction = Some(controller_direction)
@@ -213,9 +218,9 @@ impl SnakeWorld {
         }
         for snake_remove_number in snakes_numbers_to_remove {
             if let Some(removed_snake_info) = self.snakes_info.remove(&snake_remove_number) {
-                let controller = snakes_controllers.get(&snake_remove_number);
-                if let Some(controller) = controller {
-                    (*controller).snake_died(&removed_snake_info, &self.get_view());
+                let controller = self.config.snakes_controllers.get(&snake_remove_number);
+                if let Some(mut controller) = controller {
+                    controller.as_ref().borrow_mut().snake_died(&removed_snake_info, &world_view);
                 }
             }
             self.world.remove_layer(&ObjectType::Snake(snake_remove_number))
@@ -237,10 +242,5 @@ impl SnakeWorld {
     }
     pub fn generate_map(&self) -> HashMap<Point<NumberSize>, ObjectType> {
         self.world.generate_map()
-    }
-    pub fn get_view(&self) -> View {
-        View {
-            world: &self.world
-        }
     }
 }
