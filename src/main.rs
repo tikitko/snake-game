@@ -13,7 +13,7 @@ extern crate crossterm;
 
 use crate::snake_game::{SnakeGame, SnakeGameCreateError, SnakeGameConfig, SnakeGameGameController, SnakeGameTickType, SnakeGameActionType};
 use crate::snake_world::{SnakeWorld, SnakeWorldCreateError, SnakeWorldConfig, SnakeWorldSnakeController, SnakeWorldWorldView, SnakeWorldObjectType, SnakeWorldSnakeInfo};
-use crate::terminal::{ErrorKind, TerminalPixel, Terminal, KeyCode, Result};
+use crate::terminal::{ErrorKind, TerminalPixel, Terminal, KeyCode};
 use crate::direction::Direction;
 use std::time::Duration;
 use std::thread;
@@ -43,15 +43,22 @@ struct TerminalSnakeController {
     terminal: Rc<RefCell<Terminal>>
 }
 impl SnakeWorldSnakeController for TerminalSnakeController {
-    fn snake_burn(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+    fn snake_will_burn(&mut self, world_view: &SnakeWorldWorldView) {}
 
-    fn snake_move(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) -> Direction {
+    fn snake_did_burn(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+
+    fn snake_will_move(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) -> Direction {
         Direction::Right
     }
 
-    fn snake_died(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+    fn snake_did_move(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+
+    fn snake_will_died(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+
+    fn snake_did_died(&mut self, world_view: &SnakeWorldWorldView) {}
 }
 struct TerminalSnakeGameController {
+    is_inited: bool,
     terminal: Rc<RefCell<Terminal>>
 }
 impl SnakeGameGameController for TerminalSnakeGameController {
@@ -59,10 +66,10 @@ impl SnakeGameGameController for TerminalSnakeGameController {
         SnakeGameActionType::Start
     }
 
-    fn game_world_config(&mut self) -> SnakeWorldConfig {
-        let mut controllers: HashMap<usize, Box<RefCell<dyn SnakeWorldSnakeController>>> = HashMap::new();
-        for i in 0..50 {
-            controllers.insert(i, Box::new(RefCell::new(TerminalSnakeController { terminal: self.terminal.clone() })));
+    fn game_start(&mut self) -> SnakeWorldConfig {
+        let mut controllers: HashMap<usize, Rc<RefCell<dyn SnakeWorldSnakeController>>> = HashMap::new();
+        for i in 0..2 {
+            controllers.insert(i, Rc::new(RefCell::new(TerminalSnakeController { terminal: self.terminal.clone() })));
         }
         SnakeWorldConfig {
             world_size: (100, 30),
@@ -71,26 +78,29 @@ impl SnakeGameGameController for TerminalSnakeGameController {
         }
     }
 
-    fn game_world_create_state(&mut self, state: core::result::Result<(), SnakeWorldCreateError>) {}
-
-    fn game_start(&mut self) {}
-
-    fn game_tick(&mut self, world_view: SnakeWorldWorldView) -> SnakeGameTickType {
-        thread::sleep(Duration::from_millis(100));
-        SnakeGameTickType::Common
-    }
-
     fn game_map_update(&mut self, map: HashMap<Point<u16>, SnakeWorldObjectType>) {
         self.terminal.borrow_mut().render_points(&map);
     }
 
-    fn game_end(&mut self) {}
+    fn game_will_tick(&mut self, world_view: SnakeWorldWorldView) -> SnakeGameTickType {
+        thread::sleep(Duration::from_millis(100));
+        if self.is_inited {
+            SnakeGameTickType::Common
+        } else {
+            self.is_inited = true;
+            SnakeGameTickType::Initial
+        }
+    }
+
+    fn game_did_tick(&mut self, world_view: SnakeWorldWorldView) {}
+
+    fn game_end(&mut self, state: Result<(), SnakeWorldCreateError>) {}
 }
 
 fn main() {
     let terminal = Rc::new(RefCell::new(Terminal::new()));
-    let controller = TerminalSnakeGameController { terminal: terminal.clone() };
-    let config = SnakeGameConfig { game_controller: Box::new(RefCell::new(controller)) };
+    let controller = TerminalSnakeGameController { is_inited: false, terminal: terminal.clone() };
+    let config = SnakeGameConfig { game_controller: Rc::new(RefCell::new(controller)) };
 
     let mut game = SnakeGame::try_create(config).unwrap();
     game.start();

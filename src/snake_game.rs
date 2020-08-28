@@ -15,8 +15,9 @@ use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
 use std::hash::Hash;
 use crate::snake_world::{SnakeWorldConfig, SnakeWorldWorldView, SnakeWorldSnakeController, SnakeWorldObjectType};
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
+use std::borrow::{BorrowMut, Borrow};
 
 type Config = SnakeGameConfig;
 type CreateError = SnakeGameCreateError;
@@ -25,7 +26,12 @@ type TickType = SnakeGameTickType;
 type GameController = dyn SnakeGameGameController;
 
 pub struct SnakeGameConfig {
-    pub game_controller: Box<RefCell<GameController>>
+    pub game_controller: Rc<RefCell<GameController>>
+}
+impl SnakeGameConfig {
+    fn game_controller(&self) -> RefMut<GameController> {
+        self.game_controller.as_ref().borrow_mut()
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -39,18 +45,18 @@ pub enum SnakeGameActionType {
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SnakeGameTickType {
+    Initial,
     Common,
-    EndGame,
+    Break,
 }
 
 pub trait SnakeGameGameController {
     fn game_action(&mut self) -> ActionType;
-    fn game_world_config(&mut self) -> SnakeWorldConfig;
-    fn game_world_create_state(&mut self, state: Result<(), SnakeWorldCreateError>);
-    fn game_start(&mut self);
-    fn game_tick(&mut self, world_view: SnakeWorldWorldView) -> TickType;
+    fn game_start(&mut self) -> SnakeWorldConfig;
+    fn game_will_tick(&mut self, world_view: SnakeWorldWorldView) -> TickType;
+    fn game_did_tick(&mut self, world_view: SnakeWorldWorldView);
     fn game_map_update(&mut self, map: HashMap<Point<u16>, SnakeWorldObjectType>);
-    fn game_end(&mut self);
+    fn game_end(&mut self, state: Result<(), SnakeWorldCreateError>);
 }
 
 pub struct SnakeGame {
@@ -64,27 +70,30 @@ impl SnakeGame {
         })
     }
     pub fn start(&mut self) {
-        loop {
-            match self.config.game_controller.borrow_mut().game_action() {
+        'game_loop: loop {
+            match self.config.game_controller().game_action() {
                 SnakeGameActionType::Start => {},
-                SnakeGameActionType::Exit => break,
+                SnakeGameActionType::Exit => break 'game_loop,
             }
-
-            let world_config = self.config.game_controller.borrow_mut().game_world_config();
+            let world_config = self.config.game_controller().game_start();
             match SnakeWorld::try_create(world_config) {
                 Ok(mut world) => {
-                    self.config.game_controller.borrow_mut().game_world_create_state(Ok(()));
-
-                    self.config.game_controller.borrow_mut().game_start();
-                    loop {
-                        self.config.game_controller.borrow_mut().game_tick(world.get_world_view());
-                        world.tick();
-                        self.config.game_controller.borrow_mut().game_map_update(world.generate_map());
+                    'tick_loop: loop {
+                        let world_view = world.get_world_view();
+                        let tick_type = self.config.game_controller().game_will_tick(world_view);
+                        match tick_type {
+                            SnakeGameTickType::Initial => world.tick(true),
+                            SnakeGameTickType::Common => world.tick(false),
+                            SnakeGameTickType::Break => break 'tick_loop,
+                        };
+                        let world_view = world.get_world_view();
+                        self.config.game_controller().game_did_tick(world_view);
+                        self.config.game_controller().game_map_update(world.generate_map());
                     }
-                    self.config.game_controller.borrow_mut().game_end();
+                    self.config.game_controller().game_end(Ok(()));
                 }
                 Err(err) => {
-                    self.config.game_controller.borrow_mut().game_world_create_state(Err(err));
+                    self.config.game_controller().game_end(Err(err));
                 }
             }
         }
