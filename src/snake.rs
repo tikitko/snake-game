@@ -8,7 +8,8 @@ use direction::Direction;
 use std::ops::{Add, Sub};
 use std::hash::Hash;
 
-impl<N> Node<Point<N>> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+impl<N> Node<Point<N>> where
+    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     fn recursive_move_chain_to(&mut self, point: Point<N>, add_node_to_end: bool) {
         let current_point = self.get_value();
         self.set_value(point);
@@ -16,6 +17,20 @@ impl<N> Node<Point<N>> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash
             next_node.recursive_move_chain_to(current_point, add_node_to_end)
         } else if add_node_to_end {
             self.set_next_node(Some(Box::new(Self::new(current_point))))
+        }
+    }
+    fn recursive_child_remove<F>(&mut self, should_remove: F) -> bool where
+        F: Fn(Point<N>) -> bool {
+        match self.get_next_node_mut() {
+            Some(mut next_node) => {
+                if should_remove(next_node.get_value()) {
+                    self.set_next_node(None);
+                    true
+                } else {
+                    next_node.recursive_child_remove(should_remove)
+                }
+            },
+            None => false,
         }
     }
     fn x(&self) -> N {
@@ -26,12 +41,14 @@ impl<N> Node<Point<N>> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash
     }
 }
 
-pub struct Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+pub struct Snake<N> where
+    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     head_point_node: Box<Node<Point<N>>>,
     is_stomach_not_empty: bool,
 }
 
-impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+impl<N> Snake<N> where
+    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn make_on(point: Point<N>) -> Self {
         Snake {
             head_point_node: Box::new(Node::new(point)),
@@ -56,7 +73,8 @@ impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     }
 }
 
-impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + From<u8> {
+impl<N> Snake<N> where
+    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + From<u8> {
     pub fn next_head_point(&self, move_direction: Direction) -> Point<N> {
         let mut x = self.head_point_node.x();
         let mut y = self.head_point_node.y();
@@ -74,5 +92,9 @@ impl<N> Snake<N> where N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + Fro
         self.is_stomach_not_empty = false;
         let next_head_point = self.next_head_point(move_direction);
         self.head_point_node.recursive_move_chain_to(next_head_point, is_body_increased)
+    }
+    pub fn remove_tail<F>(&mut self, should_remove: F) -> bool where
+        F: Fn(Point<N>) -> bool {
+        self.head_point_node.recursive_child_remove(should_remove)
     }
 }

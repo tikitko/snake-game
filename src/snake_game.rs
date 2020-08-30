@@ -26,7 +26,7 @@ type TickType = SnakeGameTickType;
 type GameController = dyn SnakeGameGameController;
 
 pub struct SnakeGameConfig {
-    pub game_controller: Rc<RefCell<GameController>>
+    pub game_controller: Rc<RefCell<GameController>>,
 }
 impl SnakeGameConfig {
     fn game_controller(&self) -> RefMut<GameController> {
@@ -53,9 +53,8 @@ pub enum SnakeGameTickType {
 pub trait SnakeGameGameController {
     fn game_action(&mut self) -> ActionType;
     fn game_start(&mut self) -> SnakeWorldConfig;
-    fn game_will_tick(&mut self, world_view: SnakeWorldWorldView) -> TickType;
-    fn game_did_tick(&mut self, world_view: SnakeWorldWorldView);
-    fn game_map_update(&mut self, map: HashMap<Point<u16>, SnakeWorldObjectType>);
+    fn game_will_tick(&mut self, previous_world_view: &Option<SnakeWorldWorldView>) -> TickType;
+    fn game_did_tick(&mut self, world_view: &SnakeWorldWorldView);
     fn game_end(&mut self, state: Result<(), SnakeWorldCreateError>);
 }
 
@@ -65,36 +64,33 @@ pub struct SnakeGame {
 
 impl SnakeGame {
     pub fn try_create(config: Config) -> Result<Self, CreateError> {
-        Ok(SnakeGame {
-            config
-        })
+        Ok(SnakeGame { config })
     }
     pub fn start(&mut self) {
         'game_loop: loop {
-            match self.config.game_controller().game_action() {
-                SnakeGameActionType::Start => {},
-                SnakeGameActionType::Exit => break 'game_loop,
-            }
-            let world_config = self.config.game_controller().game_start();
-            match SnakeWorld::try_create(world_config) {
-                Ok(mut world) => {
-                    'tick_loop: loop {
-                        let world_view = world.get_world_view();
-                        let tick_type = self.config.game_controller().game_will_tick(world_view);
-                        match tick_type {
-                            SnakeGameTickType::Initial => world.tick(true),
-                            SnakeGameTickType::Common => world.tick(false),
-                            SnakeGameTickType::Break => break 'tick_loop,
-                        };
-                        let world_view = world.get_world_view();
-                        self.config.game_controller().game_did_tick(world_view);
-                        self.config.game_controller().game_map_update(world.generate_map());
+            let game_action = self.config.game_controller().game_action();
+            match game_action {
+                SnakeGameActionType::Start => {
+                    let world_config = self.config.game_controller().game_start();
+                    match SnakeWorld::try_create(world_config) {
+                        Ok(mut world) => {
+                            let mut last_world_view: Option<SnakeWorldWorldView> = None;
+                            'tick_loop: loop {
+                                let tick_type = self.config.game_controller().game_will_tick(&last_world_view);
+                                let world_view = match tick_type {
+                                    SnakeGameTickType::Initial => world.tick(true),
+                                    SnakeGameTickType::Common => world.tick(false),
+                                    SnakeGameTickType::Break => break 'tick_loop,
+                                };
+                                self.config.game_controller().game_did_tick(&world_view);
+                                last_world_view = Some(world_view);
+                            }
+                            self.config.game_controller().game_end(Ok(()));
+                        },
+                        Err(err) => self.config.game_controller().game_end(Err(err)),
                     }
-                    self.config.game_controller().game_end(Ok(()));
-                }
-                Err(err) => {
-                    self.config.game_controller().game_end(Err(err));
-                }
+                },
+                SnakeGameActionType::Exit => break 'game_loop,
             }
         }
     }
