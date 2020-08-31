@@ -22,14 +22,14 @@ impl<N> Node<Point<N>> where
     fn recursive_child_remove<F>(&mut self, should_remove: F) -> bool where
         F: Fn(Point<N>) -> bool {
         match self.get_next_node_mut() {
-            Some(mut next_node) => {
+            Some(next_node) => {
                 if should_remove(next_node.get_value()) {
                     self.set_next_node(None);
                     true
                 } else {
                     next_node.recursive_child_remove(should_remove)
                 }
-            },
+            }
             None => false,
         }
     }

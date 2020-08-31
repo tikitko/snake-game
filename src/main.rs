@@ -11,15 +11,13 @@ mod snake_world;
 
 extern crate crossterm;
 
-use crate::snake_game::{SnakeGame, SnakeGameCreateError, SnakeGameConfig, SnakeGameGameController, SnakeGameTickType, SnakeGameActionType};
-use crate::snake_world::{SnakeWorld, SnakeWorldCreateError, SnakeWorldConfig, SnakeWorldSnakeController, SnakeWorldWorldView, SnakeWorldObjectType, SnakeWorldSnakeInfo};
-use crate::terminal::{ErrorKind, TerminalPixel, Terminal, KeyCode};
+use crate::snake_game::{SnakeGame, SnakeGameConfig, SnakeGameGameController, SnakeGameTickType, SnakeGameActionType};
+use crate::snake_world::{SnakeWorldCreateError, SnakeWorldConfig, SnakeWorldSnakeController, SnakeWorldWorldView, SnakeWorldObjectType, SnakeWorldSnakeInfo};
+use crate::terminal::{TerminalPixel, Terminal, KeyCode};
 use crate::direction::Direction;
 use std::time::{Duration, SystemTime};
 use std::thread;
 use std::collections::HashMap;
-use std::collections::hash_map::RandomState;
-use crate::point::Point;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::panic;
@@ -28,7 +26,7 @@ impl TerminalPixel for SnakeWorldObjectType {
     fn char(&self) -> char {
         match self {
             SnakeWorldObjectType::Border => '#',
-            SnakeWorldObjectType::Snake(n) => 'o',//((n.clone() as u8 + 1) as char)/*'o'*/,
+            SnakeWorldObjectType::Snake(n) => ((n.clone() as u8 + 1) as char)/*'o'*/,
             SnakeWorldObjectType::Eat => '@',
         }
     }
@@ -37,8 +35,9 @@ impl TerminalPixel for SnakeWorldObjectType {
 struct TerminalSnakeController {
     control_number: usize,
     terminal: Rc<RefCell<Terminal>>,
-    current_key_code: Rc<RefCell<Option<KeyCode>>>
+    current_key_code: Rc<RefCell<Option<KeyCode>>>,
 }
+
 impl SnakeWorldSnakeController for TerminalSnakeController {
     fn snake_will_burn(&mut self, world_view: &SnakeWorldWorldView) {}
 
@@ -56,7 +55,7 @@ impl SnakeWorldSnakeController for TerminalSnakeController {
                         Some(v) => v.clone(),
                         None => Direction::Right,
                     }
-                },
+                }
             },
             1 => match self.current_key_code.borrow().as_ref().unwrap_or(&KeyCode::Right) {
                 KeyCode::Right => Direction::Right,
@@ -68,7 +67,7 @@ impl SnakeWorldSnakeController for TerminalSnakeController {
                         Some(v) => v.clone(),
                         None => Direction::Right,
                     }
-                },
+                }
             },
             _ => Direction::Right,
         }
@@ -76,15 +75,21 @@ impl SnakeWorldSnakeController for TerminalSnakeController {
 
     fn snake_did_move(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
 
+    fn snake_will_eat(&mut self, good_eat: bool, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+
+    fn snake_did_eat(&mut self, good_eat: bool, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
+
     fn snake_will_died(&mut self, self_info: &SnakeWorldSnakeInfo, world_view: &SnakeWorldWorldView) {}
 
     fn snake_did_died(&mut self, world_view: &SnakeWorldWorldView) {}
 }
+
 struct TerminalSnakeGameController {
     last_tick_start: Option<SystemTime>,
     terminal: Rc<RefCell<Terminal>>,
-    current_key_code: Rc<RefCell<Option<KeyCode>>>
+    current_key_code: Rc<RefCell<Option<KeyCode>>>,
 }
+
 impl SnakeGameGameController for TerminalSnakeGameController {
     fn game_action(&mut self) -> SnakeGameActionType {
         SnakeGameActionType::Start
@@ -100,7 +105,9 @@ impl SnakeGameGameController for TerminalSnakeGameController {
         SnakeWorldConfig {
             world_size: (100, 30),
             eat_count: 3,
-            snakes_controllers: controllers
+            cut_tails: true,
+            base_snake_tail_size: 3,
+            snakes_controllers: controllers,
         }
     }
 
@@ -116,21 +123,21 @@ impl SnakeGameGameController for TerminalSnakeGameController {
             Some(time) => {
                 match time.elapsed() {
                     Ok(difference) => {
-                        let after_time = (difference.as_millis() as u64);
+                        let after_time = difference.as_millis() as u64;
                         if after_time < minimum_delay_millis {
                             thread::sleep(Duration::from_millis(minimum_delay_millis - after_time))
                         }
-                    },
+                    }
                     Err(_) => thread::sleep(Duration::from_millis(minimum_delay_millis))
                 }
                 self.last_tick_start = Some(SystemTime::now());
                 SnakeGameTickType::Common
-            },
+            }
             None => {
                 thread::sleep(Duration::from_millis(minimum_delay_millis));
                 self.last_tick_start = Some(SystemTime::now());
                 SnakeGameTickType::Initial
-            },
+            }
         }
     }
 
@@ -150,35 +157,14 @@ fn main() {
         thread::sleep(Duration::from_secs(5));
     }));
 
-    let terminal = Rc::new(RefCell::new(Terminal::new()));
-    let controller = TerminalSnakeGameController { last_tick_start: None, terminal: terminal.clone(), current_key_code: Rc::new(RefCell::new(None)) };
-    let config = SnakeGameConfig { game_controller: Rc::new(RefCell::new(controller)) };
+    let controller = TerminalSnakeGameController {
+        last_tick_start: None,
+        terminal: Rc::new(RefCell::new(Terminal::new())),
+        current_key_code: Rc::new(RefCell::new(None)),
+    };
+    let config = SnakeGameConfig {
+        game_controller: Rc::new(RefCell::new(controller))
+    };
 
     SnakeGame::try_create(config).unwrap().start();
 }
-
-/*fn start_snake_game(snake_game: &mut SnakeGame, terminal: &mut Terminal) -> Result<()> {
-    Terminal::enable_raw_mode()?;
-    terminal.clear()?;
-    loop {
-        let mut controllers_directions = HashMap::new();
-        match Terminal::current_key_code(Duration::from_millis(0))? {
-            KeyCode::Char('d') => controllers_directions.insert(0, Some(Direction::Right)),
-            KeyCode::Char('a') => controllers_directions.insert(0, Some(Direction::Left)),
-            KeyCode::Char('w') => controllers_directions.insert(0, Some(Direction::Up)),
-            KeyCode::Char('s') => controllers_directions.insert(0, Some(Direction::Down)),
-            KeyCode::Right => controllers_directions.insert(1, Some(Direction::Right)),
-            KeyCode::Left => controllers_directions.insert(1, Some(Direction::Left)),
-            KeyCode::Up => controllers_directions.insert(1, Some(Direction::Up)),
-            KeyCode::Down => controllers_directions.insert(1, Some(Direction::Down)),
-            KeyCode::Char('q') => break,
-            _ => None
-        };
-        snake_game.game_tick();
-        let map = snake_game.generate_map();
-        terminal.render_points(&map)?;
-
-    }   thread::sleep(Duration::from_millis(100));
-    Terminal::disable_raw_mode()?;
-    Ok(())
-}*/
