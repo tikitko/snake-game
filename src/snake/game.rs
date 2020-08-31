@@ -1,58 +1,50 @@
-use super::snake_world;
-use snake_world::{SnakeWorld, SnakeWorldCreateError};
+use super::world;
 
 use std::hash::Hash;
-use crate::snake_world::{SnakeWorldConfig, SnakeWorldWorldView};
 use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
-type Config = SnakeGameConfig;
-type CreateError = SnakeGameCreateError;
-type ActionType = SnakeGameActionType;
-type TickType = SnakeGameTickType;
-type GameController = dyn SnakeGameGameController;
-
-pub struct SnakeGameConfig {
-    pub game_controller: Rc<RefCell<GameController>>,
+pub struct Config {
+    pub game_controller: Rc<RefCell<dyn GameController>>,
 }
 
-impl SnakeGameConfig {
-    fn game_controller(&self) -> RefMut<GameController> {
+impl Config {
+    fn game_controller(&self) -> RefMut<dyn GameController> {
         self.game_controller.as_ref().borrow_mut()
     }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum SnakeGameCreateError {}
+pub enum CreateError {}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum SnakeGameActionType {
+pub enum ActionType {
     Start,
     Exit,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum SnakeGameTickType {
+pub enum TickType {
     Initial,
     Common,
     Break,
 }
 
-pub trait SnakeGameGameController {
+pub trait GameController {
     fn game_action(&mut self) -> ActionType;
-    fn game_start(&mut self) -> SnakeWorldConfig;
-    fn game_will_tick(&mut self, previous_world_view: &Option<SnakeWorldWorldView>) -> TickType;
-    fn game_did_tick(&mut self, world_view: &SnakeWorldWorldView);
-    fn game_end(&mut self, state: Result<(), SnakeWorldCreateError>);
+    fn game_start(&mut self) -> world::Config;
+    fn game_will_tick(&mut self, previous_world_view: &Option<world::WorldView>) -> TickType;
+    fn game_did_tick(&mut self, world_view: &world::WorldView);
+    fn game_end(&mut self, state: Result<(), world::CreateError>);
 }
 
-pub struct SnakeGame {
+pub struct Game {
     config: Config,
 }
 
-impl SnakeGame {
+impl Game {
     pub fn try_create(config: Config) -> Result<Self, CreateError> {
-        Ok(SnakeGame {
+        Ok(Game {
             config
         })
     }
@@ -63,9 +55,9 @@ impl SnakeGame {
         'game_loop: loop {
             let game_action = self.config.game_controller().game_action();
             match game_action {
-                SnakeGameActionType::Start => {
+                ActionType::Start => {
                     let world_config = self.config.game_controller().game_start();
-                    match SnakeWorld::try_create(world_config) {
+                    match world::World::try_create(world_config) {
                         Ok(mut world) => {
                             self.start_tick_loop(&mut world);
                             self.config.game_controller().game_end(Ok(()));
@@ -73,18 +65,18 @@ impl SnakeGame {
                         Err(err) => self.config.game_controller().game_end(Err(err)),
                     }
                 }
-                SnakeGameActionType::Exit => break 'game_loop,
+                ActionType::Exit => break 'game_loop,
             }
         }
     }
-    fn start_tick_loop(&mut self, world: &mut SnakeWorld) {
-        let mut last_world_view: Option<SnakeWorldWorldView> = None;
+    fn start_tick_loop(&mut self, world: &mut world::World) {
+        let mut last_world_view: Option<world::WorldView> = None;
         'tick_loop: loop {
             let tick_type = self.config.game_controller().game_will_tick(&last_world_view);
             let world_view = match tick_type {
-                SnakeGameTickType::Initial => world.tick(true),
-                SnakeGameTickType::Common => world.tick(false),
-                SnakeGameTickType::Break => break 'tick_loop,
+                TickType::Initial => world.tick(true),
+                TickType::Common => world.tick(false),
+                TickType::Break => break 'tick_loop,
             };
             self.config.game_controller().game_did_tick(&world_view);
             last_world_view = Some(world_view);
