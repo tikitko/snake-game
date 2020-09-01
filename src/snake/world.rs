@@ -115,7 +115,7 @@ impl World {
         if (4 + config.base_snake_tail_size + 1 + 4) as AreaSize > config.world_size.0 {
             return Err(CreateError::TooLargeSnakeTail);
         }
-        Ok(World {
+        Ok(Self {
             world: GenericWorld::new(),
             snakes_info: HashMap::new(),
             border_points: HashSet::new(),

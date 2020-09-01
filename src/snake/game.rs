@@ -44,7 +44,7 @@ pub struct Game {
 
 impl Game {
     pub fn try_create(config: Config) -> Result<Self, CreateError> {
-        Ok(Game {
+        Ok(Self {
             config
         })
     }
