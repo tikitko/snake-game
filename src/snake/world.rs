@@ -97,13 +97,13 @@ impl World {
         if config.world_size.0 < 10 || config.world_size.1 < 10 {
             return Err(CreateError::WorldSmall);
         }
-        if config.world_size.0 > 100 || config.world_size.1 > 100 {
+        if config.world_size.0 > 1000 || config.world_size.1 > 1000 {
             return Err(CreateError::WorldLarge);
         }
         if config.eat_count < 1 {
             return Err(CreateError::FoodLack);
         }
-        if config.eat_count > 10 {
+        if config.eat_count > 100 {
             return Err(CreateError::FoodExcess);
         }
         if config.snakes_controllers.len() < 1 {
