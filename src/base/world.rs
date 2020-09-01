@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Add, Sub};
-use crate::point::Point;
+use crate::base::point::Point;
 
+#[derive(Clone)]
 pub struct World<L, N> where
     L: Hash + Eq,
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {

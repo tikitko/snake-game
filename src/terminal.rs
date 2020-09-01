@@ -1,12 +1,12 @@
+use crate::base::point::Point;
+
 use std::io::{stdout, Write, Stdout};
 use std::collections::HashMap;
 use std::time::Duration;
 use crossterm::{cursor, style, QueueableCommand, terminal};
 use crossterm::style::{StyledContent, ContentStyle};
 use crossterm::event::{read, Event, poll};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-
-use crate::point::Point;
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
 
 pub type TerminalPoints<P> = HashMap<Point<u16>, P>;
 pub type TerminalMatrix<P> = Vec<Vec<P>>;
@@ -30,6 +30,9 @@ impl Terminal {
             stdout: stdout(),
             cache: HashMap::new(),
         }
+    }
+    pub fn size() -> Result<(u16, u16)> {
+        size()
     }
     pub fn enable_raw_mode() -> Result<()> {
         enable_raw_mode()
