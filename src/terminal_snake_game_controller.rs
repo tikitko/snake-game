@@ -39,6 +39,7 @@ impl GameController {
         Self {
             last_tick_start: None,
             terminal: Terminal::new(),
+            world_error: None,
             first_snake: Rc::new(RefCell::new(SnakeController {
                 next_direction: None
             })),
