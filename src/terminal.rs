@@ -3,7 +3,7 @@ use crate::base::point::Point;
 use std::io::{stdout, Write, Stdout};
 use std::collections::HashMap;
 use std::time::Duration;
-use crossterm::{cursor, style, QueueableCommand, terminal};
+use crossterm::{cursor, style, QueueableCommand, terminal, ExecutableCommand};
 use crossterm::style::{StyledContent, ContentStyle};
 use crossterm::event::{read, Event, poll};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
@@ -51,11 +51,11 @@ impl Terminal {
         }
     }
     pub fn clear(&mut self) -> Result<()> {
-        self.stdout.queue(terminal::Clear(terminal::ClearType::All))?;
+        self.stdout.execute(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
-    pub fn render_points<P>(&mut self, points: &TerminalPoints<P>) -> Result<()> where
-        P: TerminalPixel {
+    pub fn render_points<P>(&mut self, points: &TerminalPoints<P>) -> Result<()>
+        where P: TerminalPixel {
         let mut previous_cache = self.cache.clone();
         self.cache = HashMap::new();
         for (point, pixel) in points {
@@ -94,8 +94,8 @@ impl Terminal {
         self.stdout.flush()?;
         Ok(())
     }
-    pub fn render_matrix<P>(&mut self, matrix: &TerminalMatrix<P>) -> Result<()> where
-        P: TerminalPixel {
+    pub fn render_matrix<P>(&mut self, matrix: &TerminalMatrix<P>) -> Result<()>
+        where P: TerminalPixel {
         let previous_cache = self.cache.clone();
         self.cache = HashMap::new();
         for (i, row) in matrix.iter().enumerate() {

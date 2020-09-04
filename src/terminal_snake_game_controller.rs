@@ -27,8 +27,8 @@ impl TerminalPixel for world::ObjectType {
 }
 
 struct GameController {
-    last_tick_start: Option<SystemTime>,
     terminal: Terminal,
+    last_tick_start: Option<SystemTime>,
     world_error: Option<world::CreateError>,
     first_snake: Rc<RefCell<SnakeController>>,
     second_snake: Rc<RefCell<SnakeController>>,
@@ -36,8 +36,8 @@ struct GameController {
 impl GameController {
     pub fn new() -> Self {
         Self {
-            last_tick_start: None,
             terminal: Terminal::new(),
+            last_tick_start: None,
             world_error: None,
             first_snake: Rc::new(RefCell::new(SnakeController {
                 next_direction: None
@@ -64,18 +64,19 @@ impl GameController {
 }
 impl game::GameController for GameController {
     fn game_action(&mut self) -> game::ActionType {
-        match self.world_error {
+        self.first_snake.borrow_mut().next_direction = None;
+        self.second_snake.borrow_mut().next_direction = None;
+        self.last_tick_start = None;
+        let world_error = self.world_error;
+        self.world_error = None;
+        match world_error {
             Some(_) => game::ActionType::Exit,
-            None => match self.last_tick_start {
-                Some(_) => game::ActionType::Exit,
-                None => game::ActionType::Start,
-            }
+            None => game::ActionType::Start,
         }
     }
     fn game_start(&mut self) -> world::Config {
         let _ = Terminal::enable_raw_mode();
         let _ = self.terminal.clear();
-
         let mut controllers = HashMap::<usize, Rc<RefCell<dyn world::SnakeController>>>::new();
         controllers.insert(0, self.first_snake.clone());
         controllers.insert(1, self.second_snake.clone());
@@ -90,7 +91,10 @@ impl game::GameController for GameController {
     fn game_will_tick(&mut self, world_view: &Option<world::WorldView>) -> game::TickType {
         self.delay_if_needed();
         match world_view {
-            Some(_) => {
+            Some(world_view) => {
+                if world_view.get_snakes_info().len() == 0 {
+                    return game::TickType::Break
+                }
                 let current_key_code = Terminal::current_key_code(Duration::from_millis(0));
                 match current_key_code.ok() {
                     Some(key_code) => {
