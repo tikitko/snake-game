@@ -5,7 +5,7 @@ extern crate crossterm;
 mod base;
 mod snake;
 mod terminal;
-mod terminal_snake_game_controller;
+mod terminal_snake_game_config;
 
 use crate::snake::game;
 

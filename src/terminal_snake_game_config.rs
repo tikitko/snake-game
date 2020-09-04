@@ -20,7 +20,11 @@ impl TerminalPixel for world::ObjectType {
     fn char(&self) -> char {
         match self {
             world::ObjectType::Border => '#',
-            world::ObjectType::Snake(_) => 'o',
+            world::ObjectType::Snake(number) => match number {
+                0 => 'o',
+                1 => 'x',
+                _ => ' ',
+            },
             world::ObjectType::Eat => '@',
         }
     }
