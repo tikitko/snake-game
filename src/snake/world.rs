@@ -200,7 +200,14 @@ impl World {
         }
         // Snakes: snakes_move
         let mut points_move_vectors = HashMap::<Point<AreaSize>, HashSet<Direction>>::new();
-        for snake_number in 0..self.snakes_info.len() {
+        let snakes_numbers = {
+            let mut snakes_numbers = Vec::<usize>::new();
+            for (key, snake_number) in self.snakes_info.keys().enumerate() {
+                snakes_numbers.insert(key, snake_number.clone());
+            }
+            snakes_numbers
+        };
+        for snake_number in snakes_numbers {
             let mut new_direction: Option<Direction> = None;
             if let Some(snake_info) = self.snakes_info.get(&snake_number) {
                 new_direction = snake_info.direction;
