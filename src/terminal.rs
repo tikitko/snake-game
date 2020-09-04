@@ -51,6 +51,7 @@ impl Terminal {
         }
     }
     pub fn clear(&mut self) -> Result<()> {
+        self.cache.clear();
         self.stdout.execute(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
