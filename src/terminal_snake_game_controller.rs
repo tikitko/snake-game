@@ -1,6 +1,5 @@
 use super::base::direction::Direction;
 use super::snake::{game, world};
-
 use super::terminal::{TerminalPixel, Terminal, KeyCode};
 
 use std::time::{Duration, SystemTime};

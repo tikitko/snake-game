@@ -4,8 +4,8 @@ use super::base::world::World as GenericWorld;
 use super::base::direction::Direction;
 use super::AreaSize;
 
-use rand::Rng;
-use rand::rngs::ThreadRng;
+use crate::{set_rand_current_time_seed, get_rand_in_range};
+
 use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
 use std::hash::Hash;
@@ -109,7 +109,6 @@ pub struct World {
     border_points: HashSet<Point<AreaSize>>,
     eat_points: HashSet<Point<AreaSize>>,
     config: Config,
-    rng: ThreadRng,
 }
 
 impl World {
@@ -141,7 +140,6 @@ impl World {
             border_points: HashSet::new(),
             eat_points: HashSet::new(),
             config,
-            rng: rand::thread_rng(),
         })
     }
     pub fn tick(&mut self, reset: bool) -> WorldView {
@@ -365,11 +363,16 @@ impl World {
         }
         // Eat
         let eat_to_spawn = self.config.eat_count - self.eat_points.len() as AreaSize;
+        unsafe {
+            set_rand_current_time_seed();
+        }
         for _ in 0..eat_to_spawn {
             loop {
-                let x = self.rng.gen_range(1, self.config.world_size.0 - 1);
-                let y = self.rng.gen_range(1, self.config.world_size.1 - 1);
-                let point = Point::new(x, y);
+                let point: Point<AreaSize> = unsafe {
+                    let x = get_rand_in_range(1, (self.config.world_size.0 - 1) as i32);
+                    let y = get_rand_in_range(1, (self.config.world_size.1 - 1) as i32);
+                    Point::new(x as u16, y as u16)
+                };
                 if self.world_mask.point_occurrences(&point).len() == 0 {
                     self.eat_points.insert(point);
                     break;

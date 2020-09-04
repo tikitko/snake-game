@@ -4,8 +4,5 @@ version = "0.0.1"
 authors = ["Nikita Bykov <bns.6587@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 crossterm = "0.17.6"
-rand = "0.7.3"
