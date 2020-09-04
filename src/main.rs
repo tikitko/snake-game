@@ -8,14 +8,10 @@ mod terminal;
 mod terminal_snake_game_controller;
 
 use crate::snake::game;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 fn main() {
-    let game_controller = terminal_snake_game_controller::GameController::new();
-    let game_config = game::Config {
-        game_controller: Rc::new(RefCell::new(game_controller))
+    match game::Game::try_create(game::Config::terminal()) {
+        Ok(mut game) => game.start(),
+        Err(e) => panic!(e),
     };
-    let mut game = game::Game::try_create(game_config).unwrap();
-    game.start();
 }

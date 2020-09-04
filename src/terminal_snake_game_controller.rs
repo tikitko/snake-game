@@ -9,6 +9,14 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+impl game::Config {
+    pub fn terminal() -> Self {
+        Self {
+            game_controller: Rc::new(RefCell::new(GameController::new()))
+        }
+    }
+}
+
 impl TerminalPixel for world::ObjectType {
     fn char(&self) -> char {
         match self {
@@ -19,9 +27,10 @@ impl TerminalPixel for world::ObjectType {
     }
 }
 
-pub struct GameController {
+struct GameController {
     last_tick_start: Option<SystemTime>,
     terminal: Terminal,
+    world_error: Option<world::CreateError>,
     first_snake: Rc<RefCell<SnakeController>>,
     second_snake: Rc<RefCell<SnakeController>>,
 }
@@ -55,9 +64,12 @@ impl GameController {
 }
 impl game::GameController for GameController {
     fn game_action(&mut self) -> game::ActionType {
-        match self.last_tick_start {
+        match self.world_error {
             Some(_) => game::ActionType::Exit,
-            None => game::ActionType::Start,
+            None => match self.last_tick_start {
+                Some(_) => game::ActionType::Exit,
+                None => game::ActionType::Start,
+            }
         }
     }
     fn game_start(&mut self) -> world::Config {
@@ -110,10 +122,14 @@ impl game::GameController for GameController {
         }
     }
     fn game_did_tick(&mut self, world_view: &world::WorldView) {
-        let map = world_view.generate_map();
+        let map = world_view.get_world_mask().generate_map();
         let _ = self.terminal.render_points(&map);
     }
-    fn game_end(&mut self, _: Result<(), world::CreateError>) {
+    fn game_end(&mut self, state: Result<(), world::CreateError>) {
+        self.world_error = match state {
+            Ok(_) => None,
+            Err(e) => Some(e),
+        };
         let _ = self.terminal.clear();
         let _ = Terminal::disable_raw_mode();
     }
