@@ -33,7 +33,6 @@ impl TerminalPixel for world::ObjectType {
 struct GameController {
     terminal: Terminal,
     last_tick_start: Option<SystemTime>,
-    world_error: Option<world::CreateError>,
     first_snake: Rc<RefCell<SnakeController>>,
     second_snake: Rc<RefCell<SnakeController>>,
 }
@@ -42,7 +41,6 @@ impl GameController {
         Self {
             terminal: Terminal::new(),
             last_tick_start: None,
-            world_error: None,
             first_snake: Rc::new(RefCell::new(SnakeController {
                 next_direction: None
             })),
@@ -70,10 +68,9 @@ impl game::GameController for GameController {
     fn game_action(&mut self) -> game::ActionType {
         self.first_snake.borrow_mut().next_direction = None;
         self.second_snake.borrow_mut().next_direction = None;
+        let last_tick_start = self.last_tick_start;
         self.last_tick_start = None;
-        let world_error = self.world_error;
-        self.world_error = None;
-        match world_error {
+        match last_tick_start {
             Some(_) => game::ActionType::Exit,
             None => game::ActionType::Start,
         }
@@ -133,11 +130,7 @@ impl game::GameController for GameController {
         let map = world_view.get_world_mask().generate_map();
         let _ = self.terminal.render_points(&map);
     }
-    fn game_end(&mut self, state: Result<(), world::CreateError>) {
-        self.world_error = match state {
-            Ok(_) => None,
-            Err(e) => Some(e),
-        };
+    fn game_end(&mut self, _: Result<(), world::CreateError>) {
         let _ = self.terminal.clear();
         let _ = Terminal::disable_raw_mode();
     }
