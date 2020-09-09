@@ -2,9 +2,8 @@ use super::snake::Snake;
 use super::base::point::Point;
 use super::base::world::World as GenericWorld;
 use super::base::direction::Direction;
+use super::base::{set_rand_current_time_seed, get_rand_in_range};
 use super::AreaSize;
-
-use crate::{set_rand_current_time_seed, get_rand_in_range};
 
 use std::collections::{HashSet, HashMap};
 use std::iter::FromIterator;
