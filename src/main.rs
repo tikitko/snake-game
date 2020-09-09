@@ -1,15 +1,18 @@
 #![allow(dead_code)]
 
-use crate::snake::game;
-
 mod base;
 mod snake;
 mod terminal;
-mod terminal_snake_game_config;
+mod terminal_snake_game_controller;
 
 fn main() {
-    match game::Game::try_create(game::Config::terminal()) {
-        Ok(mut game) => game.start(),
-        Err(e) => panic!(e),
+    start_snake_game();
+}
+
+fn start_snake_game() {
+    let terminal_game_controller = terminal_snake_game_controller::GameController::new();
+    let game_config = snake::game::Config {
+        game_controller: std::rc::Rc::new(std::cell::RefCell::new(terminal_game_controller))
     };
+    snake::game::Game::try_create(game_config).unwrap().start();
 }

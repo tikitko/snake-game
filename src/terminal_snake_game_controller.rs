@@ -8,14 +8,6 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-impl game::Config {
-    pub fn terminal() -> Self {
-        Self {
-            game_controller: Rc::new(RefCell::new(GameController::new()))
-        }
-    }
-}
-
 impl TerminalPixel for world::ObjectType {
     fn char(&self) -> char {
         match self {
@@ -30,7 +22,7 @@ impl TerminalPixel for world::ObjectType {
     }
 }
 
-struct GameController {
+pub struct GameController {
     terminal: Terminal,
     last_tick_start: Option<SystemTime>,
     first_snake: Rc<RefCell<SnakeController>>,
