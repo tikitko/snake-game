@@ -30,6 +30,7 @@ pub struct GameController {
 }
 
 impl GameController {
+    const MINIMUM_DELAY_MILLIS: u64 = 150;
     pub fn new() -> Self {
         Self {
             terminal: Terminal::new(),
@@ -43,16 +44,15 @@ impl GameController {
         }
     }
     fn delay_if_needed(&mut self) {
-        let minimum_delay_millis = 150;
         match self.last_tick_start.and_then(|v| v.elapsed().ok()) {
             Some(difference) => {
                 let after_time = difference.as_millis() as u64;
-                if after_time < minimum_delay_millis {
-                    let delay_time = minimum_delay_millis - after_time;
+                if after_time < Self::MINIMUM_DELAY_MILLIS {
+                    let delay_time = Self::MINIMUM_DELAY_MILLIS - after_time;
                     thread::sleep(Duration::from_millis(delay_time))
                 }
             }
-            None => thread::sleep(Duration::from_millis(minimum_delay_millis)),
+            None => thread::sleep(Duration::from_millis(Self::MINIMUM_DELAY_MILLIS)),
         }
         self.last_tick_start = Some(SystemTime::now());
     }
