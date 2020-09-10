@@ -28,38 +28,40 @@ pub struct GameController {
     first_snake: Rc<RefCell<SnakeController>>,
     second_snake: Rc<RefCell<SnakeController>>,
 }
+
 impl GameController {
     pub fn new() -> Self {
         Self {
             terminal: Terminal::new(),
             last_tick_start: None,
             first_snake: Rc::new(RefCell::new(SnakeController {
-                next_direction: None
+                next_direction: Direction::Right
             })),
             second_snake: Rc::new(RefCell::new(SnakeController {
-                next_direction: None
+                next_direction: Direction::Right
             })),
         }
     }
     fn delay_if_needed(&mut self) {
         let minimum_delay_millis = 150;
-        match self.last_tick_start.and_then(|v|v.elapsed().ok()) {
+        match self.last_tick_start.and_then(|v| v.elapsed().ok()) {
             Some(difference) => {
                 let after_time = difference.as_millis() as u64;
                 if after_time < minimum_delay_millis {
                     let delay_time = minimum_delay_millis - after_time;
                     thread::sleep(Duration::from_millis(delay_time))
                 }
-            },
+            }
             None => thread::sleep(Duration::from_millis(minimum_delay_millis)),
         }
         self.last_tick_start = Some(SystemTime::now());
     }
 }
+
 impl game::GameController for GameController {
     fn game_action(&mut self) -> game::ActionType {
-        self.first_snake.borrow_mut().next_direction = None;
-        self.second_snake.borrow_mut().next_direction = None;
+        self.first_snake.borrow_mut().next_direction = Direction::Right;
+        self.second_snake.borrow_mut().next_direction = Direction::Right;
         let last_tick_start = self.last_tick_start;
         self.last_tick_start = None;
         match last_tick_start {
@@ -86,35 +88,35 @@ impl game::GameController for GameController {
         match world_view {
             Some(world_view) => {
                 if world_view.get_snakes_info().len() == 0 {
-                    return game::TickType::Break
+                    return game::TickType::Break;
                 }
                 let current_key_code = Terminal::current_key_code(Duration::from_millis(0));
                 match current_key_code.ok() {
                     Some(key_code) => {
                         if key_code == KeyCode::Esc {
-                            return game::TickType::Break
+                            return game::TickType::Break;
                         }
                         let mut first_snake = self.first_snake.borrow_mut();
-                        first_snake.next_direction = Some(match key_code {
+                        first_snake.next_direction = match key_code {
                             KeyCode::Char('d') => Direction::Right,
                             KeyCode::Char('a') => Direction::Left,
                             KeyCode::Char('w') => Direction::Up,
                             KeyCode::Char('s') => Direction::Down,
-                            _ => first_snake.next_direction.unwrap_or(Direction::Right),
-                        });
+                            _ => first_snake.next_direction,
+                        };
                         let mut second_snake = self.second_snake.borrow_mut();
-                        second_snake.next_direction = Some(match key_code {
+                        second_snake.next_direction = match key_code {
                             KeyCode::Right => Direction::Right,
                             KeyCode::Left => Direction::Left,
                             KeyCode::Up => Direction::Up,
                             KeyCode::Down => Direction::Down,
-                            _ => second_snake.next_direction.unwrap_or(Direction::Right),
-                        });
+                            _ => second_snake.next_direction,
+                        };
                         game::TickType::Common
-                    },
+                    }
                     None => game::TickType::Common,
                 }
-            },
+            }
             None => game::TickType::Initial,
         }
     }
@@ -129,16 +131,14 @@ impl game::GameController for GameController {
 }
 
 struct SnakeController {
-    next_direction: Option<Direction>,
+    next_direction: Direction,
 }
+
 impl world::SnakeController for SnakeController {
     fn snake_will_burn(&mut self, _: &world::WorldView) {}
     fn snake_did_burn(&mut self, _: &world::SnakeInfo, _: &world::WorldView) {}
     fn snake_will_move(&mut self, _: &world::SnakeInfo, _: &world::WorldView) -> Direction {
-        match self.next_direction {
-            Some(direction) => direction,
-            None => Direction::Right,
-        }
+        self.next_direction
     }
     fn snake_did_move(&mut self, _: &world::SnakeInfo, _: &world::WorldView) {}
     fn snake_will_eat(&mut self, _: bool, _: &world::SnakeInfo, _: &world::WorldView) {}
