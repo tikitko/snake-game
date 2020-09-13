@@ -11,7 +11,10 @@ pub struct Point<N> where
 impl<N> Point<N> where
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn new(x: N, y: N) -> Self {
-        Point { x, y }
+        Self {
+            x,
+            y,
+        }
     }
     pub fn x(&self) -> N {
         self.x

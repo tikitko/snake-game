@@ -7,14 +7,16 @@ use crate::base::point::Point;
 pub struct World<L, N> where
     L: Hash + Eq,
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
-    layers: HashMap<L, HashSet<Point<N>>>
+    layers: HashMap<L, HashSet<Point<N>>>,
 }
 
 impl<L, N> World<L, N> where
     L: Hash + Eq + Copy,
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn new() -> Self {
-        World { layers: HashMap::new() }
+        Self {
+            layers: HashMap::new(),
+        }
     }
     pub fn set_layer(&mut self, layer_key: L, layer: HashSet<Point<N>>) {
         self.layers.insert(layer_key, layer);
@@ -23,7 +25,7 @@ impl<L, N> World<L, N> where
         self.layers.remove(layer_key);
     }
     pub fn remove_all_layers(&mut self) {
-        self.layers = HashMap::new()
+        self.layers.clear();
     }
     pub fn point_occurrences(&self, point: &Point<N>) -> HashSet<L> {
         let mut occurrences = HashSet::new();

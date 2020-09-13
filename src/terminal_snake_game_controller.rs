@@ -35,10 +35,10 @@ impl GameController {
             terminal: Terminal::new(),
             last_tick_start: None,
             first_snake: Rc::new(RefCell::new(SnakeController {
-                next_direction: Direction::Right
+                next_direction: Direction::Right,
             })),
             second_snake: Rc::new(RefCell::new(SnakeController {
-                next_direction: Direction::Right
+                next_direction: Direction::Right,
             })),
         }
     }
@@ -49,9 +49,9 @@ impl GameController {
                 let after_time = difference.as_millis() as u64;
                 if after_time < MINIMUM_DELAY_MILLIS {
                     let delay_time = MINIMUM_DELAY_MILLIS - after_time;
-                    thread::sleep(Duration::from_millis(delay_time))
+                    thread::sleep(Duration::from_millis(delay_time));
                 }
-            }
+            },
             None => thread::sleep(Duration::from_millis(MINIMUM_DELAY_MILLIS)),
         }
         self.last_tick_start = Some(SystemTime::now());
@@ -60,8 +60,12 @@ impl GameController {
 
 impl game::GameController for GameController {
     fn game_action(&mut self) -> game::ActionType {
-        self.first_snake.borrow_mut().next_direction = Direction::Right;
-        self.second_snake.borrow_mut().next_direction = Direction::Right;
+        if let Ok(mut first_snake) = self.first_snake.try_borrow_mut() {
+            first_snake.next_direction = Direction::Right;
+        }
+        if let Ok(mut second_snake) = self.second_snake.try_borrow_mut() {
+            second_snake.next_direction = Direction::Right;
+        }
         let last_tick_start = self.last_tick_start;
         self.last_tick_start = None;
         match last_tick_start {
@@ -96,33 +100,41 @@ impl game::GameController for GameController {
                         if key_code == KeyCode::Esc {
                             return game::TickType::Break;
                         }
-                        let mut first_snake = self.first_snake.borrow_mut();
-                        first_snake.next_direction = match key_code {
-                            KeyCode::Char('d') => Direction::Right,
-                            KeyCode::Char('a') => Direction::Left,
-                            KeyCode::Char('w') => Direction::Up,
-                            KeyCode::Char('s') => Direction::Down,
-                            _ => first_snake.next_direction,
-                        };
-                        let mut second_snake = self.second_snake.borrow_mut();
-                        second_snake.next_direction = match key_code {
-                            KeyCode::Right => Direction::Right,
-                            KeyCode::Left => Direction::Left,
-                            KeyCode::Up => Direction::Up,
-                            KeyCode::Down => Direction::Down,
-                            _ => second_snake.next_direction,
-                        };
+                        match self.first_snake.try_borrow_mut() {
+                            Ok(mut first_snake) => {
+                                first_snake.next_direction = match key_code {
+                                    KeyCode::Char('d') => Direction::Right,
+                                    KeyCode::Char('a') => Direction::Left,
+                                    KeyCode::Char('w') => Direction::Up,
+                                    KeyCode::Char('s') => Direction::Down,
+                                    _ => first_snake.next_direction,
+                                };
+                            },
+                            Err(_) => return game::TickType::Break,
+                        }
+                        match self.second_snake.try_borrow_mut() {
+                            Ok(mut second_snake) => {
+                                second_snake.next_direction = match key_code {
+                                    KeyCode::Right => Direction::Right,
+                                    KeyCode::Left => Direction::Left,
+                                    KeyCode::Up => Direction::Up,
+                                    KeyCode::Down => Direction::Down,
+                                    _ => second_snake.next_direction,
+                                };
+                            },
+                            Err(_) => return game::TickType::Break,
+                        }
                         game::TickType::Common
-                    }
+                    },
                     None => game::TickType::Common,
                 }
-            }
+            },
             None => game::TickType::Initial,
         }
     }
     fn game_did_tick(&mut self, world_view: &world::WorldView) {
         let map = world_view.get_world_mask().generate_map();
-        let _ = self.terminal.render_points(&map);
+        let _ = self.terminal.render(&map);
     }
     fn game_end(&mut self, _: Result<(), world::CreateError>) {
         let _ = self.terminal.clear();

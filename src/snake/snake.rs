@@ -11,9 +11,9 @@ impl<N> Node<Point<N>> where
         let current_point = self.get_value();
         self.set_value(point);
         if let Some(next_node) = self.get_next_node_mut() {
-            next_node.recursive_move_chain_to(current_point, add_node_to_end)
+            next_node.recursive_move_chain_to(current_point, add_node_to_end);
         } else if add_node_to_end {
-            self.set_next_node(Some(Box::new(Self::new(current_point))))
+            self.set_next_node(Some(Box::new(Self::new(current_point))));
         }
     }
     fn recursive_child_remove<F>(&mut self, should_remove: F) -> bool where
@@ -26,7 +26,7 @@ impl<N> Node<Point<N>> where
                 } else {
                     next_node.recursive_child_remove(should_remove)
                 }
-            }
+            },
             None => false,
         }
     }
@@ -47,7 +47,7 @@ pub struct Snake<N> where
 impl<N> Snake<N> where
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
     pub fn make_on(point: Point<N>) -> Self {
-        Snake {
+        Self {
             head_point_node: Box::new(Node::new(point)),
             is_stomach_not_empty: false,
         }
@@ -63,7 +63,7 @@ impl<N> Snake<N> where
         }
     }
     pub fn fill_stomach_if_empty(&mut self) {
-        self.is_stomach_not_empty = true
+        self.is_stomach_not_empty = true;
     }
     pub fn head_point(&self) -> Point<N> {
         self.head_point_node.get_value()
@@ -80,7 +80,7 @@ impl<N> Snake<N> where
             Direction::Right => x = x.add(step_value),
             Direction::Left => x = x.sub(step_value),
             Direction::Down => y = y.add(step_value),
-            Direction::Up => y = y.sub(step_value)
+            Direction::Up => y = y.sub(step_value),
         }
         Point::new(x, y)
     }
@@ -88,7 +88,7 @@ impl<N> Snake<N> where
         let is_body_increased = self.is_stomach_not_empty;
         self.is_stomach_not_empty = false;
         let next_head_point = self.next_head_point(move_direction);
-        self.head_point_node.recursive_move_chain_to(next_head_point, is_body_increased)
+        self.head_point_node.recursive_move_chain_to(next_head_point, is_body_increased);
     }
     pub fn remove_tail<F>(&mut self, should_remove: F) -> bool where
         F: Fn(Point<N>) -> bool {

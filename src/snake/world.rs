@@ -21,10 +21,10 @@ pub struct Config {
 
 impl Config {
     fn snake_controller(&self, id: &usize) -> Option<RefMut<dyn SnakeController>> {
-        let controller = self.snakes_controllers.get(id);
-        match controller {
-            Some(controller) => Some(controller.as_ref().borrow_mut()),
-            None => None,
+        let controller = self.snakes_controllers.get(id)?;
+        match controller.try_borrow_mut() {
+            Ok(v) => Some(v),
+            Err(_) => None,
         }
     }
 }
@@ -302,7 +302,7 @@ impl World {
                         },
                         ObjectType::Border => {
                             snakes_to_remove.insert(snake_number.clone());
-                        }
+                        },
                     }
                 }
             }
@@ -370,7 +370,7 @@ impl World {
         // Eat
         let eat_to_spawn = self.config.eat_count - self.eat_points.len() as AreaSize;
         unsafe {
-            set_rand_current_time_seed();
+            let _ = set_rand_current_time_seed();
         }
         for _ in 0..eat_to_spawn {
             loop {

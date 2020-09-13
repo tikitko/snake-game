@@ -9,8 +9,11 @@ pub struct Config {
 }
 
 impl Config {
-    fn game_controller(&self) -> RefMut<dyn GameController> {
-        self.game_controller.as_ref().borrow_mut()
+    fn game_controller(&self) -> Option<RefMut<dyn GameController>> {
+        match self.game_controller.try_borrow_mut() {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        }
     }
 }
 
@@ -45,40 +48,56 @@ pub struct Game {
 impl Game {
     pub fn try_create(config: Config) -> Result<Self, CreateError> {
         Ok(Self {
-            config
+            config,
         })
     }
     pub fn start(&mut self) {
-        self.start_game_loop()
+        self.start_game_loop();
     }
     fn start_game_loop(&mut self) {
-        'game_loop: loop {
-            let game_action = self.config.game_controller().game_action();
+        loop {
+            let game_action = match self.config.game_controller() {
+                Some(mut controller) => controller.game_action(),
+                None => break,
+            };
             match game_action {
                 ActionType::Start => {
-                    let world_config = self.config.game_controller().game_start();
-                    match world::World::try_create(world_config) {
+                    let world_config = match self.config.game_controller() {
+                        Some(mut controller) => controller.game_start(),
+                        None => break,
+                    };
+                    let start_result = match world::World::try_create(world_config) {
                         Ok(mut world) => {
                             self.start_tick_loop(&mut world);
-                            self.config.game_controller().game_end(Ok(()));
-                        }
-                        Err(err) => self.config.game_controller().game_end(Err(err)),
+                            Ok(())
+                        },
+                        Err(err) => Err(err),
+                    };
+                    match self.config.game_controller() {
+                        Some(mut controller) => controller.game_end(start_result),
+                        None => break,
                     }
-                }
-                ActionType::Exit => break 'game_loop,
+                },
+                ActionType::Exit => break,
             }
         }
     }
     fn start_tick_loop(&mut self, world: &mut world::World) {
         let mut last_world_view: Option<world::WorldView> = None;
-        'tick_loop: loop {
-            let tick_type = self.config.game_controller().game_will_tick(&last_world_view);
+        loop {
+            let tick_type = match self.config.game_controller() {
+                Some(mut controller) => controller.game_will_tick(&last_world_view),
+                None => break,
+            };
             let world_view = match tick_type {
                 TickType::Initial => world.tick(true),
                 TickType::Common => world.tick(false),
-                TickType::Break => break 'tick_loop,
+                TickType::Break => break,
             };
-            self.config.game_controller().game_did_tick(&world_view);
+            match self.config.game_controller() {
+                Some(mut controller) => controller.game_did_tick(&world_view),
+                None => break,
+            };
             last_world_view = Some(world_view);
         }
     }
