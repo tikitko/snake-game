@@ -76,10 +76,10 @@ impl game::GameController for GameController {
         controllers.insert(0, self.first_snake.clone());
         controllers.insert(1, self.second_snake.clone());
         world::Config {
-            world_size: (1000, 1000),
+            world_size: Terminal::size().unwrap_or((50, 50)),
             eat_count: 3,
             cut_tails: true,
-            base_snake_tail_size: 80,
+            base_snake_tail_size: 3,
             snakes_controllers: controllers,
         }
     }
