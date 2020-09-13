@@ -30,7 +30,6 @@ pub struct GameController {
 }
 
 impl GameController {
-    const MINIMUM_DELAY_MILLIS: u64 = 150;
     pub fn new() -> Self {
         Self {
             terminal: Terminal::new(),
@@ -44,15 +43,16 @@ impl GameController {
         }
     }
     fn delay_if_needed(&mut self) {
+        const MINIMUM_DELAY_MILLIS: u64 = 150;
         match self.last_tick_start.and_then(|v| v.elapsed().ok()) {
             Some(difference) => {
                 let after_time = difference.as_millis() as u64;
-                if after_time < Self::MINIMUM_DELAY_MILLIS {
-                    let delay_time = Self::MINIMUM_DELAY_MILLIS - after_time;
+                if after_time < MINIMUM_DELAY_MILLIS {
+                    let delay_time = MINIMUM_DELAY_MILLIS - after_time;
                     thread::sleep(Duration::from_millis(delay_time))
                 }
             }
-            None => thread::sleep(Duration::from_millis(Self::MINIMUM_DELAY_MILLIS)),
+            None => thread::sleep(Duration::from_millis(MINIMUM_DELAY_MILLIS)),
         }
         self.last_tick_start = Some(SystemTime::now());
     }
@@ -76,10 +76,10 @@ impl game::GameController for GameController {
         controllers.insert(0, self.first_snake.clone());
         controllers.insert(1, self.second_snake.clone());
         world::Config {
-            world_size: Terminal::size().unwrap_or((50, 50)),
+            world_size: (1000, 1000),
             eat_count: 3,
             cut_tails: true,
-            base_snake_tail_size: 3,
+            base_snake_tail_size: 80,
             snakes_controllers: controllers,
         }
     }
