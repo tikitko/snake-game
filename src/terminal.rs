@@ -58,7 +58,7 @@ impl Terminal {
         where Pixel: TerminalPixel {
         const SPACE_CHAR: char = ' ';
         let mut previous_cache = self.cache.clone();
-        self.cache = HashMap::new();
+        self.cache.clear();
         for (point, pixel) in points_map {
             let char = pixel.char();
             let is_space = char == SPACE_CHAR;

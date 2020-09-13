@@ -170,7 +170,7 @@ impl World {
                     let mut snake = Snake::make_on(Point::new(3, real_snake_number * 3));
                     for _ in 0..self.config.base_snake_tail_size {
                         snake.fill_stomach_if_empty();
-                        snake.move_to(Direction::Right)
+                        snake.move_to(Direction::Right);
                     }
                     snakes.insert(snake_number, snake);
                 }
@@ -216,7 +216,7 @@ impl World {
                     if let Some(snake_direction) = snake_info.direction {
                         let have_tail = snake_info.snake.body_parts_points(false).len() > 0;
                         if controller_direction.reverse() != snake_direction || !have_tail {
-                            new_direction = Some(controller_direction)
+                            new_direction = Some(controller_direction);
                         }
                     } else {
                         new_direction = Some(controller_direction);
