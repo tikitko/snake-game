@@ -46,7 +46,7 @@ pub struct Snake<N> where
 
 impl<N> Snake<N> where
     N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
-    pub fn make_on(point: Point<N>) -> Self {
+    pub fn new(point: Point<N>) -> Self {
         Self {
             head_point_node: Box::new(Node::new(point)),
             is_stomach_not_empty: false,
