@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "components",
+    "snake",
+    "terminal",
+    "terminal-snake"
+]
