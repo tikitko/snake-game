@@ -1,8 +1,8 @@
 use super::snake::Snake;
-use super::base::point::Point;
-use super::base::world::World as GenericWorld;
-use super::base::direction::Direction;
-use super::base::{set_rand_current_time_seed, get_rand_in_range};
+use super::components::point::Point;
+use super::components::world::World as GenericWorld;
+use super::components::direction::Direction;
+use super::components::{set_rand_current_time_seed, get_rand_in_range};
 use super::AreaSize;
 
 use std::collections::{HashSet, HashMap};

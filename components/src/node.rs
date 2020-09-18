@@ -37,4 +37,26 @@ impl<V> Node<V> where
         child_nodes_values.push(self.value);
         child_nodes_values
     }
+    pub fn recursive_run<F>(&mut self, mut entrance: F) where
+        F: FnMut(&mut Node<V>) {
+        entrance(self);
+        match self.get_next_node_mut() {
+            Some(next_node) => next_node.recursive_run(entrance),
+            None => {},
+        }
+    }
+    /*pub fn recursive_remove<F>(&mut self, should_remove: F) -> bool where
+        F: Fn(V) -> bool {
+        match self.get_next_node_mut() {
+            Some(next_node) => {
+                if should_remove(next_node.get_value()) {
+                    self.set_next_node(None);
+                    true
+                } else {
+                    next_node.recursive_remove(should_remove)
+                }
+            },
+            None => false,
+        }
+    }*/
 }

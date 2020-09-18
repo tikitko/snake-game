@@ -1,0 +1,9 @@
+[package]
+name = "terminal-snake"
+version = "0.0.1"
+authors = ["Mikita Bykau <mikita_bykau@epam.com>"]
+edition = "2018"
+
+[dependencies]
+snake = { path = "../snake" }
+terminal = { path = "../terminal" }
