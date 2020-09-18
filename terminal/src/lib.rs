@@ -1,5 +1,3 @@
-use crate::base::point::Point;
-
 use std::io::{stdout, Write, Stdout};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -8,18 +6,15 @@ use crossterm::event::{read, Event, poll};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
 
 pub type TerminalSize = u16;
-pub type TerminalPoint = Point<TerminalSize>;
+pub type TerminalPoint = (TerminalSize, TerminalSize);
+pub type TerminalPixel = char;
 pub type KeyCode = crossterm::event::KeyCode;
 pub type ErrorKind = crossterm::ErrorKind;
 pub type Result<S> = crossterm::Result<S>;
 
-pub trait TerminalPixel {
-    fn char(&self) -> char;
-}
-
 pub struct Terminal {
     stdout: Stdout,
-    cache: HashMap<TerminalPoint, char>,
+    cache: HashMap<TerminalPoint, TerminalPixel>,
 }
 
 impl Terminal {
@@ -54,19 +49,17 @@ impl Terminal {
             .execute(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
-    pub fn render<Pixel>(&mut self, points_map: &HashMap<TerminalPoint, Pixel>) -> Result<()>
-        where Pixel: TerminalPixel {
+    pub fn render(&mut self, points_map: &HashMap<TerminalPoint, TerminalPixel>) -> Result<()> {
         const SPACE_CHAR: char = ' ';
         let mut previous_cache = self.cache.clone();
         self.cache.clear();
         for (point, pixel) in points_map {
-            let char = pixel.char();
-            let is_space = char == SPACE_CHAR;
+            let is_space = *pixel == SPACE_CHAR;
             if !is_space {
-                self.cache.insert(point.clone(), char);
+                self.cache.insert(point.clone(), pixel.clone());
             }
-            if let Some(previous_char) = previous_cache.get(&point) {
-                let should_skip_render = *previous_char == char;
+            if let Some(previous_pixel) = previous_cache.get(&point) {
+                let should_skip_render = previous_pixel == pixel;
                 if !is_space {
                     previous_cache.remove(&point);
                 }
@@ -76,7 +69,7 @@ impl Terminal {
             }
             self.stdout
                 .queue(cursor_move_to_command(point.clone()))?
-                .queue(print_styled_content_command(char))?;
+                .queue(print_styled_content_command(pixel.clone()))?;
         }
         for (point, _) in previous_cache {
             self.stdout
@@ -84,14 +77,14 @@ impl Terminal {
                 .queue(print_styled_content_command(SPACE_CHAR))?;
         }
         self.stdout
-            .queue(cursor_move_to_command(Point::new(0, 0)))?;
+            .queue(cursor_move_to_command((0, 0)))?;
         self.stdout.flush()?;
         Ok(())
     }
 }
 
 fn cursor_move_to_command(point: TerminalPoint) -> cursor::MoveTo {
-    cursor::MoveTo(point.x(), point.y())
+    cursor::MoveTo(point.0, point.1)
 }
 
 fn print_styled_content_command(char: char) -> style::PrintStyledContent<char> {

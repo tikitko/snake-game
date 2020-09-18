@@ -1,8 +1,8 @@
 use super::snake::Snake;
-use super::base::point::Point;
-use super::base::world::World as GenericWorld;
-use super::base::direction::Direction;
-use super::base::{set_rand_current_time_seed, get_rand_in_range};
+use super::components::point::Point;
+use super::components::world::World as GenericWorld;
+use super::components::direction::Direction;
+use super::components::{set_rand_current_time_seed, get_rand_in_range};
 use super::AreaSize;
 
 use std::collections::{HashSet, HashMap};
@@ -111,7 +111,7 @@ pub struct World {
 }
 
 impl World {
-    pub fn try_create(config: Config) -> Result<Self, CreateError> {
+    pub fn new(config: Config) -> Result<Self, CreateError> {
         if config.world_size.0 < 10 || config.world_size.1 < 10 {
             return Err(CreateError::WorldSmall);
         }
@@ -167,7 +167,7 @@ impl World {
                 for snake_number in 0..self.config.snakes_controllers.len() as AreaSize {
                     let real_snake_number = snake_number + 1;
                     let snake_number = snake_number as usize;
-                    let mut snake = Snake::make_on(Point::new(3, real_snake_number * 3));
+                    let mut snake = Snake::new(Point::new(3, real_snake_number * 3));
                     for _ in 0..self.config.base_snake_tail_size {
                         snake.fill_stomach_if_empty();
                         snake.move_to(Direction::Right);
@@ -334,7 +334,7 @@ impl World {
                 snake_info.snake.fill_stomach_if_empty();
             }
             if let Some(cut_snake_info) = self.snakes_info.get_mut(&cut_snake) {
-                cut_snake_info.snake.remove_tail(|p| p == body_point);
+                cut_snake_info.snake.recursive_remove_tail(|p| p == body_point);
                 let body_points = cut_snake_info.snake.body_parts_points(true).clone();
                 let points = HashSet::from_iter(body_points);
                 self.world_mask.set_layer(ObjectType::Snake(cut_snake.clone()), points);

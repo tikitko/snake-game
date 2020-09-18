@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Add, Sub};
-use crate::base::point::Point;
+use crate::point::Point;
 
 #[derive(Clone)]
 pub struct World<L, N> where
@@ -36,11 +36,18 @@ impl<L, N> World<L, N> where
         }
         occurrences
     }
-    pub fn generate_map(&self) -> HashMap<Point<N>, L> {
+    pub fn generate_map<PointM, ObjectM, PointR, ObjectR>(
+        &self,
+        point_mapper: PointM,
+        object_mapper: ObjectM
+    ) -> HashMap<PointR, ObjectR> where
+        PointM: Fn(&Point<N>) -> PointR,
+        ObjectM: Fn(&L) -> ObjectR,
+        PointR: Eq + Hash {
         let mut map = HashMap::new();
         for (layer_key, layer) in &self.layers {
             for point in layer {
-                map.insert(point.clone(), layer_key.clone());
+                map.insert(point_mapper(point), object_mapper(layer_key));
             }
         }
         map
