@@ -1,8 +1,7 @@
-[package]
-name = "rust-snake"
-version = "0.0.1"
-authors = ["Nikita Bykov <bns.6587@gmail.com>"]
-edition = "2018"
-
-[dependencies]
-crossterm = "0.17.6"
+[workspace]
+members = [
+    "components",
+    "snake",
+    "terminal",
+    "terminal-snake"
+]

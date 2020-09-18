@@ -1,0 +1,8 @@
+[package]
+name = "terminal"
+version = "0.0.1"
+authors = ["Tikitko <bns.6587@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+crossterm = "0.17.6"

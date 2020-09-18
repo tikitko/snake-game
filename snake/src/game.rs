@@ -46,7 +46,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn try_create(config: Config) -> Result<Self, CreateError> {
+    pub fn new(config: Config) -> Result<Self, CreateError> {
         Ok(Self {
             config,
         })
@@ -66,7 +66,7 @@ impl Game {
                         Some(mut controller) => controller.game_start(),
                         None => break,
                     };
-                    let start_result = match world::World::try_create(world_config) {
+                    let start_result = match world::World::new(world_config) {
                         Ok(mut world) => {
                             self.start_tick_loop(&mut world);
                             Ok(())
