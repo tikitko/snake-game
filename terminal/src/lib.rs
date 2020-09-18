@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use crossterm::{cursor, style, QueueableCommand, terminal, ExecutableCommand};
 use crossterm::event::{read, Event, poll};
-pub use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
+use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
 
 pub type TerminalSize = u16;
 pub type TerminalPoint = (TerminalSize, TerminalSize);
@@ -11,17 +11,6 @@ pub type TerminalPixel = char;
 pub type KeyCode = crossterm::event::KeyCode;
 pub type ErrorKind = crossterm::ErrorKind;
 pub type Result<S> = crossterm::Result<S>;
-
-pub fn current_key_code(wait_for_duration: Duration) -> Result<KeyCode> {
-    if poll(wait_for_duration)? {
-        match read()? {
-            Event::Key(key_event) => Ok(key_event.code),
-            _ => Ok(KeyCode::Null),
-        }
-    } else {
-        Ok(KeyCode::Null)
-    }
-}
 
 pub struct Terminal {
     stdout: Stdout,
@@ -33,6 +22,25 @@ impl Terminal {
         Self {
             stdout: stdout(),
             cache: HashMap::new(),
+        }
+    }
+    pub fn size() -> Result<(TerminalSize, TerminalSize)> {
+        size()
+    }
+    pub fn enable_raw_mode() -> Result<()> {
+        enable_raw_mode()
+    }
+    pub fn disable_raw_mode() -> Result<()> {
+        disable_raw_mode()
+    }
+    pub fn current_key_code(wait_for_duration: Duration) -> Result<KeyCode> {
+        if poll(wait_for_duration)? {
+            match read()? {
+                Event::Key(key_event) => Ok(key_event.code),
+                _ => Ok(KeyCode::Null),
+            }
+        } else {
+            Ok(KeyCode::Null)
         }
     }
     pub fn clear(&mut self) -> Result<()> {

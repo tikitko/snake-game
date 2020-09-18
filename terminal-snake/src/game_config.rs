@@ -1,11 +1,7 @@
 use super::terminal::{
     TerminalSize,
     Terminal,
-    KeyCode,
-    current_key_code,
-    enable_raw_mode,
-    disable_raw_mode,
-    size
+    KeyCode
 };
 use super::snake::{
     Direction,
@@ -90,13 +86,13 @@ impl GameController for TerminalGameController {
         }
     }
     fn game_start(&mut self) -> WorldConfig {
-        let _ = enable_raw_mode();
+        let _ = Terminal::enable_raw_mode();
         let _ = self.terminal.clear();
         let mut controllers = HashMap::<usize, Rc<RefCell<dyn SnakeController>>>::new();
         controllers.insert(0, self.first_snake.clone());
         controllers.insert(1, self.second_snake.clone());
         WorldConfig {
-            world_size: size().unwrap_or((50, 50)),
+            world_size: Terminal::size().unwrap_or((50, 50)),
             eat_count: 3,
             cut_tails: true,
             base_snake_tail_size: 3,
@@ -110,7 +106,7 @@ impl GameController for TerminalGameController {
                 if world_view.get_snakes_info().len() == 0 {
                     return GameTickType::Break;
                 }
-                let current_key_code = current_key_code(Duration::from_millis(0));
+                let current_key_code = Terminal::current_key_code(Duration::from_millis(0));
                 match current_key_code.ok() {
                     Some(key_code) => {
                         if key_code == KeyCode::Esc {
@@ -164,7 +160,7 @@ impl GameController for TerminalGameController {
     }
     fn game_end(&mut self, _: Result<(), WorldCreateError>) {
         let _ = self.terminal.clear();
-        let _ = disable_raw_mode();
+        let _ = Terminal::disable_raw_mode();
     }
 }
 

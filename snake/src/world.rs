@@ -334,7 +334,7 @@ impl World {
                 snake_info.snake.fill_stomach_if_empty();
             }
             if let Some(cut_snake_info) = self.snakes_info.get_mut(&cut_snake) {
-                cut_snake_info.snake.remove_tail(|p| p == body_point);
+                cut_snake_info.snake.recursive_remove_tail(|p| p == body_point);
                 let body_points = cut_snake_info.snake.body_parts_points(true).clone();
                 let points = HashSet::from_iter(body_points);
                 self.world_mask.set_layer(ObjectType::Snake(cut_snake.clone()), points);

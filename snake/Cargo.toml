@@ -1,7 +1,7 @@
 [package]
 name = "snake"
 version = "0.0.1"
-authors = ["Mikita Bykau <mikita_bykau@epam.com>"]
+authors = ["Tikitko <bns.6587@gmail.com>"]
 edition = "2018"
 
 [dependencies]
