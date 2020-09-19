@@ -60,34 +60,30 @@ impl<N> Snake<N> where
     }
     fn recursive_move_body_to(&mut self, point: Point<N>, add_body_to_end: bool) {
         let mut next_point: Option<Point<N>> = Some(point);
-        self.head_point_node.recursive_run(|node| {
-            match next_point {
-                Some(point) => {
-                    let current_point = node.get_value();
-                    node.set_value(point);
-                    match node.get_next_node() {
-                        Some(_) => next_point = Some(current_point),
-                        None => if add_body_to_end {
-                            node.set_next_node(Some(Node::new(current_point)));
-                            next_point = None;
-                        } else {
-                            next_point = Some(current_point);
-                        },
-                    }
-                },
-                None => {},
-            }
+        self.head_point_node.recursive_run(|node| match next_point {
+            Some(point) => {
+                let current_point = node.get_value();
+                node.set_value(point);
+                match node.get_next_node() {
+                    Some(_) => next_point = Some(current_point),
+                    None => if add_body_to_end {
+                        node.set_next_node(Some(Node::new(current_point)));
+                        next_point = None;
+                    } else {
+                        next_point = Some(current_point);
+                    },
+                }
+            },
+            None => {},
         });
     }
     pub fn recursive_remove_tail<F>(&mut self, should_remove: F) where
         F: Fn(Point<N>) -> bool {
-        self.head_point_node.recursive_run(|node| {
-            match node.get_next_node_mut() {
-                Some(next_node) => if should_remove(next_node.get_value()) {
-                    node.set_next_node(None);
-                },
-                None => {},
-            }
+        self.head_point_node.recursive_run(|node| match node.get_next_node_mut() {
+            Some(next_node) => if should_remove(next_node.get_value()) {
+                node.set_next_node(None);
+            },
+            None => {},
         });
     }
 }
