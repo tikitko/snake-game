@@ -3,5 +3,6 @@ members = [
     "components",
     "snake",
     "terminal",
-    "terminal-snake"
+    "terminal-snake",
+    "websocket-server-snake"
 ]
