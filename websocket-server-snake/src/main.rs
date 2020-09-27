@@ -85,7 +85,9 @@ mod websocket {
             Running::Stop
         }
     }
-    pub struct DirectionMessage;
+    pub struct DirectionMessage {
+        with_reset: bool,
+    }
     impl Message for DirectionMessage {
         type Result = Option<Direction>;
     }
@@ -94,10 +96,15 @@ mod websocket {
 
         fn handle(
             &mut self,
-            _: DirectionMessage,
+            direction_message: DirectionMessage,
             _: &mut Self::Context
         ) -> Self::Result {
-            self.direction
+            if direction_message.with_reset {
+                self.direction = None;
+                None
+            } else {
+                self.direction
+            }
         }
     }
 
@@ -257,6 +264,14 @@ mod websocket {
             }
         }
         fn game_end(&mut self, _: Result<(), CreateError>) {
+            match &self.current_players {
+                Some(players) => for (_, addr) in players {
+                    addr.do_send(DirectionMessage {
+                        with_reset: true
+                    });
+                },
+                None => {},
+            }
             self.last_tick_start = None;
             self.current_players = None;
         }
@@ -277,7 +292,10 @@ mod websocket {
         fn snake_will_burn(&mut self, _: &WorldView) {}
         fn snake_did_burn(&mut self, _: &SnakeInfo, _: &WorldView) {}
         fn snake_will_move(&mut self, _: &SnakeInfo, _: &WorldView) -> Direction {
-            let result = futures::executor::block_on(self.addr.send(DirectionMessage));
+            let direction_message = DirectionMessage {
+                with_reset: false
+            };
+            let result = futures::executor::block_on(self.addr.send(direction_message));
             match result.unwrap_or(None) {
                 Some(direction) => direction,
                 None => Direction::Right,
