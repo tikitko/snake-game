@@ -323,7 +323,7 @@ async fn main() -> std::io::Result<()> {
         .service(snake);
 
     HttpServer::new(app_factory)
-        .bind("127.0.0.1:9000")?
+        .bind("127.0.0.1:8080")?
         .run()
         .await
 }
