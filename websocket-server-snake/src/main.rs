@@ -218,7 +218,7 @@ mod websocket {
                         return snake::world::Config {
                             world_size: (50, 50), /// Should be 255 to send as 8bit sized point!
                             eat_count: 3,
-                            cut_tails: true,
+                            cut_tails: false,
                             base_snake_tail_size: 3,
                             snakes_controllers: snake_controllers,
                         }
