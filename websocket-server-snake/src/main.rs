@@ -6,7 +6,7 @@ use std::sync::{RwLock, Arc};
 use std::thread;
 use actix::clock::Duration;
 use std::rc::Rc;
-use actix_web::web::block;
+use actix_web::web::{block, Bytes};
 use actix_web::rt::blocking::BlockingError;
 use actix::prelude::Future;
 use std::time::SystemTime;
@@ -25,11 +25,11 @@ mod websocket {
     use std::time::SystemTime;
     use actix::clock::Duration;
     use snake::Direction;
-    use snake::world::{WorldView, SnakeInfo, CreateError};
+    use snake::world::{WorldView, SnakeInfo, CreateError, ObjectType};
     use std::thread;
     use std::rc::Rc;
     use std::cell::RefCell;
-    use actix_web::web::{block, Bytes};
+    use bytes::{Bytes, BytesMut, BufMut};
 
     pub struct GameCoordinator {
         players: HashMap<Uuid, Addr<PlayerSession>>
@@ -125,8 +125,32 @@ mod websocket {
         ) {
             match msg {
                 Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
-                Ok(ws::Message::Text(text)) => ctx.text(text),
-                Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
+                // Ok(ws::Message::Text(text)) => ctx.text(text),
+                Ok(ws::Message::Binary(bin)) => {
+                    let mut bytes = bin.clone();
+                    let (packet_type, packet_data) = bytes.split_at(1);
+                    let packet_type = packet_type.first();
+                    /// Temp packet example!
+                   match packet_type {
+                       Some(packet_type) => match packet_type {
+                           199 => {
+                               let direction = match packet_data.first() {
+                                   Some(direction_number) => match direction_number {
+                                       1 => Some(Direction::Right),
+                                       2 => Some(Direction::Left),
+                                       3 => Some(Direction::Down),
+                                       4 => Some(Direction::Up),
+                                       _ => None,
+                                   },
+                                   None => None,
+                               };
+                               self.direction = direction;
+                           },
+                           _ => {},
+                       },
+                       None => {},
+                   }
+                },
                 Ok(ws::Message::Close(_)) => ctx.stop(),
                 _ => (),
             }
@@ -185,7 +209,7 @@ mod websocket {
                         };
                         self.current_players = Some(players);
                         return snake::world::Config {
-                            world_size: (300, 300),
+                            world_size: (50, 50), /// Should be 255 to send as 8bit sized point!
                             eat_count: 3,
                             cut_tails: true,
                             base_snake_tail_size: 3,
@@ -213,10 +237,21 @@ mod websocket {
         }
         fn game_did_tick(&mut self, world_view: &WorldView) {
             let map = world_view.get_world_mask().generate_map(|p| p.clone(), |o| o.clone());
+            let mut buf = BytesMut::new();
+            buf.put_u8(200); // Temp packet example!
+            for (point, object) in map {
+                buf.put_u8(point.x() as u8);
+                buf.put_u8(point.y() as u8);
+                buf.put_u8(match object {
+                    ObjectType::Border => 0,
+                    ObjectType::Snake(_) => 1,
+                    ObjectType::Eat => 2,
+                });
+            }
+            let bytes = buf.freeze();
             match &self.current_players {
                 Some(players) => for (_, addr) in players {
-                    let bytes = Bytes::from("PING");
-                    addr.do_send(BinaryMessage(bytes));
+                    addr.do_send(BinaryMessage(bytes.clone()));
                 },
                 None => {},
             }
