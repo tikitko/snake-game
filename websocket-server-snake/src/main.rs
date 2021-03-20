@@ -1,27 +1,17 @@
-use actix::{Actor, StreamHandler, AsyncContext, Addr, Running, ActorContext, Arbiter, ContextFutureSpawner, Handler, Message, MailboxError};
+use actix::Arbiter;
 use actix_web::{get, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
-use std::collections::HashMap;
 use std::sync::{RwLock, Arc};
-use std::thread;
 use actix::clock::Duration;
-use std::rc::Rc;
-use actix_web::web::{block, Bytes};
-use actix_web::rt::blocking::BlockingError;
-use actix::prelude::Future;
 use std::time::SystemTime;
-use uuid::Uuid;
-use websocket::{GameCoordinator, PlayerSession};
-use std::cell::RefCell;
+use crate::websocket::{Player, SessionContainer, PlayersLobby, snake_game};
 
 mod websocket {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use actix::{Addr, Actor, Running, Message, Handler, StreamHandler, ActorContext, AsyncContext};
     use actix_web::web;
-    use std::sync::RwLock;
+    use std::sync::{RwLock, Arc};
     use actix_web_actors::ws;
-    use std::any::Any;
-    use uuid::Uuid;
     use std::time::SystemTime;
     use actix::clock::Duration;
     use snake::Direction;
@@ -30,151 +20,207 @@ mod websocket {
     use std::rc::Rc;
     use std::cell::RefCell;
     use bytes::{Bytes, BytesMut, BufMut};
+    use std::task::Context;
+    use actix_web_actors::ws::ProtocolError;
 
-    pub struct GameCoordinator {
-        players: HashMap<Uuid, Addr<PlayerSession>>
+    /// - Packet
+
+    struct Packet {
+        id: u8,
+        data: Vec<u8>
     }
 
-    impl GameCoordinator {
-        pub fn get_players(&self) -> &HashMap<Uuid, Addr<PlayerSession>> {
-            &self.players
-        }
-    }
-
-    impl Default for GameCoordinator {
-        fn default() -> Self {
-            GameCoordinator {
-                players: HashMap::new(),
+    impl Packet {
+        fn from_bytes(bytes: Bytes) -> Option<Self> {
+            if bytes.len() < 1 {
+                return None
             }
-        }
-    }
-
-    pub struct PlayerSession {
-        id: Uuid,
-        game_coordinator: web::Data<RwLock<GameCoordinator>>,
-        direction: Option<Direction>,
-    }
-
-    impl PlayerSession {
-        pub fn new(id: Uuid, game_coordinator: web::Data<RwLock<GameCoordinator>>) -> Self {
-            PlayerSession {
+            let (id_part, data_part) = bytes.split_at(1);
+            let id = id_part.first().unwrap().clone();
+            let data = data_part.to_vec();
+            Some(Packet {
                 id,
-                game_coordinator,
-                direction: None,
+                data
+            })
+        }
+    }
+
+    /// - ClientPacket
+
+    enum ClientPacket {
+        Direction(Option<Direction>)
+    }
+
+    impl ClientPacket {
+        fn from_bytes(bytes: Bytes) -> Option<Self> {
+            let packet = Packet::from_bytes(bytes)?;
+            match packet.id  {
+                199 => Some(ClientPacket::Direction(match packet.data.first() {
+                    Some(1) => Some(Direction::Right),
+                    Some(2) => Some(Direction::Left),
+                    Some(3) => Some(Direction::Down),
+                    Some(4) => Some(Direction::Up),
+                    _ => None,
+                })),
+                _ => None
             }
         }
     }
 
-    impl Actor for PlayerSession {
-        type Context = ws::WebsocketContext<Self>;
-        fn started(&mut self, ctx: &mut Self::Context) {
-            match self.game_coordinator.write() {
-                Ok(mut game_coordinator) => {
-                    game_coordinator.players.insert(self.id, ctx.address());
-                },
-                Err(_) => {},
-            }
-        }
-        fn stopping(&mut self, _: &mut Self::Context) -> Running {
-            match self.game_coordinator.write() {
-                Ok(mut game_coordinator) => {
-                    game_coordinator.players.remove(&self.id);
-                }
-                Err(_) => {}
-            }
-            Running::Stop
-        }
-    }
-    pub struct DirectionMessage {
-        with_reset: bool,
-    }
-    impl Message for DirectionMessage {
-        type Result = Option<Direction>;
-    }
-    impl Handler<DirectionMessage> for PlayerSession {
-        type Result = Option<Direction>;
+    /// - PlayersLobby
 
-        fn handle(
+    pub struct PlayersLobby {
+        pub players: Vec<Arc<RwLock<Player>>>
+    }
+
+    impl Default for PlayersLobby {
+        fn default() -> Self {
+            PlayersLobby {
+                players: Vec::new()
+            }
+        }
+    }
+
+    /// - Player
+
+    pub struct Player {
+        address: Option<Addr<SessionContainer<Self>>>,
+        direction: Option<Direction>
+    }
+
+    impl Default for Player {
+        fn default() -> Self {
+            Player {
+                address: None,
+                direction: None
+            }
+        }
+    }
+
+    impl Player {
+        fn is_active(&self) -> bool {
+            self.address.is_some()
+        }
+    }
+
+    impl SessionObject for Player {
+        fn session_started(
             &mut self,
-            direction_message: DirectionMessage,
-            _: &mut Self::Context
-        ) -> Self::Result {
-            if direction_message.with_reset {
-                self.direction = None;
-                None
-            } else {
-                self.direction
-            }
+            ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
+        ) {
+            self.address = Some(ctx.address());
         }
-    }
 
-    pub struct BinaryMessage(Bytes);
-    impl Message for BinaryMessage {
-        type Result = ();
-    }
-    impl Handler<BinaryMessage> for PlayerSession {
-        type Result = ();
-
-        fn handle(
-            &mut self,
-            binary_message: BinaryMessage,
-            ctx: &mut Self::Context
-        ) -> Self::Result {
-            ctx.binary(binary_message.0)
-        }
-    }
-
-    impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PlayerSession {
-        fn handle(
+        fn session_message(
             &mut self,
             msg: Result<ws::Message, ws::ProtocolError>,
-            ctx: &mut Self::Context,
+            ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
         ) {
             match msg {
                 Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
                 // Ok(ws::Message::Text(text)) => ctx.text(text),
-                Ok(ws::Message::Binary(bin)) => {
-                    let mut bytes = bin.clone();
-                    let (packet_type, packet_data) = bytes.split_at(1);
-                    let packet_type = packet_type.first();
-                    /// Temp packet example!
-                   match packet_type {
-                       Some(packet_type) => match packet_type {
-                           199 => {
-                               let direction = match packet_data.first() {
-                                   Some(direction_number) => match direction_number {
-                                       1 => Some(Direction::Right),
-                                       2 => Some(Direction::Left),
-                                       3 => Some(Direction::Down),
-                                       4 => Some(Direction::Up),
-                                       _ => None,
-                                   },
-                                   None => None,
-                               };
-                               self.direction = direction;
-                           },
-                           _ => {},
-                       },
-                       None => {},
-                   }
+                Ok(ws::Message::Binary(bytes)) => {
+                    let client_packet = ClientPacket::from_bytes(bytes);
+                    match client_packet {
+                        Some(ClientPacket::Direction(direction)) => {
+                            self.direction = direction;
+                        }
+                        None => {}
+                    }
                 },
                 Ok(ws::Message::Close(_)) => ctx.stop(),
                 _ => (),
             }
         }
+
+        fn session_stopped(
+            &mut self,
+            _ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
+        ) {
+            self.address = None;
+        }
     }
 
+    /// - SessionContainer
+
+    pub trait SessionObject: Sized {
+        fn session_started(
+            &mut self,
+            ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
+        );
+        fn session_message(
+            &mut self,
+            msg: Result<ws::Message, ws::ProtocolError>,
+            ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
+        );
+        fn session_stopped(
+            &mut self,
+            ctx: &mut ws::WebsocketContext<SessionContainer<Self>>
+        );
+    }
+
+    pub struct SessionContainer<T> where
+        T: SessionObject,
+        T: 'static {
+        object: Arc<RwLock<T>>
+    }
+
+    impl<T> SessionContainer<T> where
+        T: SessionObject,
+        T: 'static {
+        pub fn new(object: Arc<RwLock<T>>) -> Self {
+            SessionContainer {
+                object
+            }
+        }
+    }
+
+    impl<T> Actor for SessionContainer<T> where
+        T: SessionObject,
+        T: 'static  {
+        type Context = ws::WebsocketContext<Self>;
+        fn started(&mut self, ctx: &mut Self::Context) {
+            match self.object.write() {
+                Ok(mut object) => object.session_started(ctx),
+                Err(_) => ()
+            }
+        }
+        fn stopped(&mut self, ctx: &mut Self::Context) {
+            match self.object.write() {
+                Ok(mut object) => object.session_stopped(ctx),
+                Err(_) => ()
+            }
+        }
+    }
+
+    impl<T> StreamHandler<Result<ws::Message, ws::ProtocolError>> for SessionContainer<T> where
+        T: SessionObject,
+        T: 'static {
+        fn handle(
+            &mut self,
+            msg: Result<ws::Message, ws::ProtocolError>,
+            ctx: &mut Self::Context
+        ) {
+            match self.object.write() {
+                Ok(mut object) => object.session_message(msg, ctx),
+                Err(_) => ()
+            }
+        }
+    }
+
+    /// - GameController
+
     struct GameController {
-        game_coordinator: web::Data<RwLock<GameCoordinator>>,
-        last_tick_start: Option<SystemTime>,
-        current_players: Option<HashMap<Uuid, Addr<PlayerSession>>>,
+        players_lobby: web::Data<RwLock<PlayersLobby>>,
+        active_players:  Vec<Arc<RwLock<Player>>>,
+        last_tick_start: Option<SystemTime>
     }
     impl GameController {
-        pub fn new(game_coordinator: web::Data<RwLock<GameCoordinator>>) -> Self {
+        pub fn new(players_lobby: web::Data<RwLock<PlayersLobby>>) -> Self {
             Self {
-                game_coordinator,
+                players_lobby,
+                active_players: Vec::new(),
                 last_tick_start: None,
-                current_players: None,
             }
         }
         fn delay_if_needed(&mut self) {
@@ -198,8 +244,8 @@ mod websocket {
         }
         fn game_start(&mut self) -> snake::world::Config {
             loop {
-                let players = match self.game_coordinator.read() {
-                    Ok(game_coordinator) => Some(game_coordinator.get_players().clone()),
+                let players = match self.game_lobby.read() {
+                    Ok(game_lobby) => Some(game_lobby.players.clone()),
                     Err(_) => None,
                 };
                 match players {
@@ -214,7 +260,7 @@ mod websocket {
                             }
                             controllers
                         };
-                        self.current_players = Some(players);
+                        self.players = Some(players);
                         return snake::world::Config {
                             world_size: (50, 50), /// Should be 255 to send as 8bit sized point!
                             eat_count: 3,
@@ -228,9 +274,12 @@ mod websocket {
                 thread::sleep(Duration::from_secs(5));
             };
         }
-        fn game_will_tick(&mut self, previous_world_view: &Option<WorldView>) -> snake::game::TickType {
+        fn game_will_tick(
+            &mut self,
+            previous_world_view: &Option<WorldView>
+        ) -> snake::game::TickType {
             self.delay_if_needed();
-            match self.current_players {
+            match self.players {
                 Some(_) => match previous_world_view {
                     Some(world_view) => if world_view.get_snakes_info().is_empty() {
                         snake::game::TickType::Break
@@ -256,7 +305,7 @@ mod websocket {
                 });
             }
             let bytes = buf.freeze();
-            match &self.current_players {
+            match &self.players {
                 Some(players) => for (_, addr) in players {
                     addr.do_send(BinaryMessage(bytes.clone()));
                 },
@@ -264,7 +313,7 @@ mod websocket {
             }
         }
         fn game_end(&mut self, _: Result<(), CreateError>) {
-            match &self.current_players {
+            match &self.players {
                 Some(players) => for (_, addr) in players {
                     addr.do_send(DirectionMessage {
                         with_reset: true
@@ -273,17 +322,18 @@ mod websocket {
                 None => {},
             }
             self.last_tick_start = None;
-            self.current_players = None;
+            self.players = None;
         }
     }
+
     struct SnakeController {
-        addr: Addr<PlayerSession>,
+        player: Arc<RwLock<Player>>
     }
 
     impl SnakeController {
-        pub fn new(addr: Addr<PlayerSession>) -> Self {
-            Self {
-                addr,
+        pub fn new(player: Arc<RwLock<Player>>) -> Self {
+            SnakeController {
+                player
             }
         }
     }
@@ -292,13 +342,12 @@ mod websocket {
         fn snake_will_burn(&mut self, _: &WorldView) {}
         fn snake_did_burn(&mut self, _: &SnakeInfo, _: &WorldView) {}
         fn snake_will_move(&mut self, _: &SnakeInfo, _: &WorldView) -> Direction {
-            let direction_message = DirectionMessage {
-                with_reset: false
-            };
-            let result = futures::executor::block_on(self.addr.send(direction_message));
-            match result.unwrap_or(None) {
-                Some(direction) => direction,
-                None => Direction::Right,
+            match self.player.read() {
+                Ok(player) => match player.direction {
+                    Some(direction) => direction,
+                    None => Direction::Right
+                },
+                Err(_) => Direction::Right
             }
         }
         fn snake_did_move(&mut self, _: &SnakeInfo, _: &WorldView) {}
@@ -308,10 +357,9 @@ mod websocket {
         fn snake_did_died(&mut self, _: &WorldView) {}
     }
 
-    pub async fn snake_game(game_coordinator: web::Data<RwLock<GameCoordinator>>) {
-        let game_controller = GameController::new(game_coordinator);
+    pub async fn snake_game(players_lobby: web::Data<RwLock<PlayersLobby>>) {
         snake::game::Game::new(snake::game::Config {
-            game_controller: Rc::new(RefCell::new(game_controller)),
+            game_controller: Rc::new(RefCell::new(GameController::new(players_lobby))),
         }).unwrap().start();
     }
 }
@@ -320,24 +368,24 @@ mod websocket {
 async fn snake(
     req: HttpRequest,
     stream: web::Payload,
-    game_coordinator: web::Data<RwLock<websocket::GameCoordinator>>,
+    players_lobby: web::Data<RwLock<PlayersLobby>>
 ) -> Result<HttpResponse, Error> {
-    let current_time_in_micros = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or(Duration::from_micros(0))
-        .as_micros();
-    let id = Uuid::from_u128(current_time_in_micros);
-    ws::start(websocket::PlayerSession::new(id, game_coordinator), &req, stream)
+    let player = Arc::new(RwLock::new(Player::default()));
+    match players_lobby.write() {
+        Ok(mut players_lobby) => players_lobby.players.push(player.clone()),
+        Err(_) => ()
+    };
+    ws::start(SessionContainer::new(player.clone()), &req, stream)
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let game_coordinator: web::Data<RwLock<websocket::GameCoordinator>> = web::Data::new(Default::default());
+    let players_lobby: web::Data<RwLock<PlayersLobby>> = web::Data::new(Default::default());
 
-    Arbiter::spawn(websocket::snake_game(game_coordinator.clone()));
+    Arbiter::spawn(snake_game(players_lobby.clone()));
 
     let app_factory = move || App::new()
-        .app_data(game_coordinator.clone())
+        .app_data(players_lobby.clone())
         .service(snake);
 
     HttpServer::new(app_factory)
