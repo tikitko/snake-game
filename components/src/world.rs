@@ -1,18 +1,22 @@
+use crate::point::Point;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::{Add, Sub};
-use crate::point::Point;
 
 #[derive(Clone)]
-pub struct World<L, N> where
+pub struct World<L, N>
+where
     L: Hash + Eq,
-    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+    N: Add<Output = N> + Sub<Output = N> + Copy + Eq + Hash,
+{
     layers: HashMap<L, HashSet<Point<N>>>,
 }
 
-impl<L, N> World<L, N> where
+impl<L, N> World<L, N>
+where
     L: Hash + Eq + Copy,
-    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+    N: Add<Output = N> + Sub<Output = N> + Copy + Eq + Hash,
+{
     pub fn new() -> Self {
         Self {
             layers: HashMap::new(),
@@ -39,11 +43,13 @@ impl<L, N> World<L, N> where
     pub fn generate_map<PointM, ObjectM, PointR, ObjectR>(
         &self,
         point_mapper: PointM,
-        object_mapper: ObjectM
-    ) -> HashMap<PointR, ObjectR> where
+        object_mapper: ObjectM,
+    ) -> HashMap<PointR, ObjectR>
+    where
         PointM: Fn(&Point<N>) -> PointR,
         ObjectM: Fn(&L) -> ObjectR,
-        PointR: Eq + Hash {
+        PointR: Eq + Hash,
+    {
         let mut map = HashMap::new();
         for (layer_key, layer) in &self.layers {
             for point in layer {

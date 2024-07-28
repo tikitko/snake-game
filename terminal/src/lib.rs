@@ -1,16 +1,14 @@
-use std::io::{stdout, Write, Stdout};
-use std::collections::HashMap;
-use std::time::Duration;
-use crossterm::{cursor, style, QueueableCommand, terminal, ExecutableCommand};
-use crossterm::event::{read, Event, poll};
+use crossterm::event::{poll, read, Event};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size};
+use crossterm::{cursor, style, terminal, ExecutableCommand, QueueableCommand};
+use std::collections::HashMap;
+use std::io::{stdout, Result, Stdout, Write};
+use std::time::Duration;
 
 pub type TerminalSize = u16;
 pub type TerminalPoint = (TerminalSize, TerminalSize);
 pub type TerminalPixel = char;
 pub type KeyCode = crossterm::event::KeyCode;
-pub type ErrorKind = crossterm::ErrorKind;
-pub type Result<S> = crossterm::Result<S>;
 
 pub struct Terminal {
     stdout: Stdout,
@@ -76,8 +74,7 @@ impl Terminal {
                 .queue(cursor_move_to_command(point.clone()))?
                 .queue(print_styled_content_command(SPACE_CHAR))?;
         }
-        self.stdout
-            .queue(cursor_move_to_command((0, 0)))?;
+        self.stdout.queue(cursor_move_to_command((0, 0)))?;
         self.stdout.flush()?;
         Ok(())
     }

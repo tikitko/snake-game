@@ -1,7 +1,7 @@
 use super::world;
 
-use std::hash::Hash;
 use std::cell::{RefCell, RefMut};
+use std::hash::Hash;
 use std::rc::Rc;
 
 pub struct Config {
@@ -47,9 +47,7 @@ pub struct Game {
 
 impl Game {
     pub fn new(config: Config) -> Result<Self, CreateError> {
-        Ok(Self {
-            config,
-        })
+        Ok(Self { config })
     }
     pub fn start(&mut self) {
         self.start_game_loop();
@@ -70,14 +68,14 @@ impl Game {
                         Ok(mut world) => {
                             self.start_tick_loop(&mut world);
                             Ok(())
-                        },
+                        }
                         Err(err) => Err(err),
                     };
                     match self.config.game_controller() {
                         Some(mut controller) => controller.game_end(start_result),
                         None => break,
                     }
-                },
+                }
                 ActionType::Exit => break,
             }
         }

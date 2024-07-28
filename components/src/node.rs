@@ -1,13 +1,17 @@
 use std::hash::Hash;
 
-pub struct Node<V> where
-    V: Copy + Hash + Eq {
+pub struct Node<V>
+where
+    V: Copy + Hash + Eq,
+{
     value: V,
     next_node: Option<Box<Node<V>>>,
 }
 
-impl<V> Node<V> where
-    V: Copy + Hash + Eq {
+impl<V> Node<V>
+where
+    V: Copy + Hash + Eq,
+{
     pub fn new(value: V) -> Self {
         Self {
             value,
@@ -37,12 +41,14 @@ impl<V> Node<V> where
         child_nodes_values.push(self.value);
         child_nodes_values
     }
-    pub fn recursive_run<F>(&mut self, mut entrance: F) where
-        F: FnMut(&mut Node<V>) {
+    pub fn recursive_run<F>(&mut self, mut entrance: F)
+    where
+        F: FnMut(&mut Node<V>),
+    {
         entrance(self);
         match self.get_next_node_mut() {
             Some(next_node) => next_node.recursive_run(entrance),
-            None => {},
+            None => {}
         }
     }
 }

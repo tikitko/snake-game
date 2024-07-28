@@ -1,18 +1,22 @@
-use super::components::point::Point;
-use super::components::node::Node;
 use super::components::direction::Direction;
+use super::components::node::Node;
+use super::components::point::Point;
 
-use std::ops::{Add, Sub};
 use std::hash::Hash;
+use std::ops::{Add, Sub};
 
-pub struct Snake<N> where
-    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+pub struct Snake<N>
+where
+    N: Add<Output = N> + Sub<Output = N> + Copy + Eq + Hash,
+{
     head_point_node: Box<Node<Point<N>>>,
     is_stomach_not_empty: bool,
 }
 
-impl<N> Snake<N> where
-    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash {
+impl<N> Snake<N>
+where
+    N: Add<Output = N> + Sub<Output = N> + Copy + Eq + Hash,
+{
     pub fn new(point: Point<N>) -> Self {
         Self {
             head_point_node: Box::new(Node::new(point)),
@@ -37,8 +41,10 @@ impl<N> Snake<N> where
     }
 }
 
-impl<N> Snake<N> where
-    N: Add<Output=N> + Sub<Output=N> + Copy + Eq + Hash + From<u8> {
+impl<N> Snake<N>
+where
+    N: Add<Output = N> + Sub<Output = N> + Copy + Eq + Hash + From<u8>,
+{
     pub fn next_head_point(&self, move_direction: Direction) -> Point<N> {
         let head_point = self.head_point_node.get_value();
         let mut x = head_point.x();
@@ -66,24 +72,31 @@ impl<N> Snake<N> where
                 node.set_value(point);
                 match node.get_next_node() {
                     Some(_) => next_point = Some(current_point),
-                    None => if add_body_to_end {
-                        node.set_next_node(Some(Node::new(current_point)));
-                        next_point = None;
-                    } else {
-                        next_point = Some(current_point);
-                    },
+                    None => {
+                        if add_body_to_end {
+                            node.set_next_node(Some(Node::new(current_point)));
+                            next_point = None;
+                        } else {
+                            next_point = Some(current_point);
+                        }
+                    }
                 }
-            },
-            None => {},
+            }
+            None => {}
         });
     }
-    pub fn recursive_remove_tail<F>(&mut self, should_remove: F) where
-        F: Fn(Point<N>) -> bool {
-        self.head_point_node.recursive_run(|node| match node.get_next_node_mut() {
-            Some(next_node) => if should_remove(next_node.get_value()) {
-                node.set_next_node(None);
-            },
-            None => {},
-        });
+    pub fn recursive_remove_tail<F>(&mut self, should_remove: F)
+    where
+        F: Fn(Point<N>) -> bool,
+    {
+        self.head_point_node
+            .recursive_run(|node| match node.get_next_node_mut() {
+                Some(next_node) => {
+                    if should_remove(next_node.get_value()) {
+                        node.set_next_node(None);
+                    }
+                }
+                None => {}
+            });
     }
 }

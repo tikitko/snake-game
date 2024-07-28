@@ -1,32 +1,18 @@
-use super::terminal::{
-    TerminalSize,
-    Terminal,
-    KeyCode
-};
-use super::snake::{
-    Direction,
-    Point
+use super::snake::game::{
+    ActionType as GameActionType, Config as GameConfig, GameController, TickType as GameTickType,
 };
 use super::snake::world::{
-    SnakeController,
-    ObjectType as WorldObjectType,
-    Config as WorldConfig,
-    CreateError as WorldCreateError,
-    WorldView,
-    SnakeInfo
+    Config as WorldConfig, CreateError as WorldCreateError, ObjectType as WorldObjectType,
+    SnakeController, SnakeInfo, WorldView,
 };
-use super::snake::game::{
-    GameController,
-    ActionType as GameActionType,
-    TickType as GameTickType,
-    Config as GameConfig
-};
+use super::snake::{Direction, Point};
+use super::terminal::{KeyCode, Terminal, TerminalSize};
 
-use std::time::{Duration, SystemTime};
-use std::thread;
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 pub fn new() -> GameConfig {
     GameConfig {
@@ -63,7 +49,7 @@ impl TerminalGameController {
                     let delay_time = MINIMUM_DELAY_MILLIS - after_time;
                     thread::sleep(Duration::from_millis(delay_time));
                 }
-            },
+            }
             None => thread::sleep(Duration::from_millis(MINIMUM_DELAY_MILLIS)),
         }
         self.last_tick_start = Some(SystemTime::now());
@@ -121,7 +107,7 @@ impl GameController for TerminalGameController {
                                     KeyCode::Char('s') => Direction::Down,
                                     _ => first_snake.next_direction,
                                 };
-                            },
+                            }
                             Err(_) => return GameTickType::Break,
                         }
                         match self.second_snake.try_borrow_mut() {
@@ -133,14 +119,14 @@ impl GameController for TerminalGameController {
                                     KeyCode::Down => Direction::Down,
                                     _ => second_snake.next_direction,
                                 };
-                            },
+                            }
                             Err(_) => return GameTickType::Break,
                         }
                         GameTickType::Common
-                    },
+                    }
                     None => GameTickType::Common,
                 }
-            },
+            }
             None => GameTickType::Initial,
         }
     }
@@ -155,7 +141,9 @@ impl GameController for TerminalGameController {
             },
             WorldObjectType::Eat => '@',
         };
-        let map = world_view.get_world_mask().generate_map(points_mapper, objects_mapper);
+        let map = world_view
+            .get_world_mask()
+            .generate_map(points_mapper, objects_mapper);
         let _ = self.terminal.render(&map);
     }
     fn game_end(&mut self, _: Result<(), WorldCreateError>) {

@@ -1,14 +1,14 @@
-use super::snake::Snake;
+use super::components::direction::Direction;
 use super::components::point::Point;
 use super::components::world::World as GenericWorld;
-use super::components::direction::Direction;
-use super::components::{set_rand_current_time_seed, get_rand_in_range};
+use super::components::{get_rand_in_range, set_rand_current_time_seed};
+use super::snake::Snake;
 use super::AreaSize;
 
-use std::collections::{HashSet, HashMap};
-use std::iter::FromIterator;
-use std::hash::Hash;
 use std::cell::{RefCell, RefMut};
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
+use std::iter::FromIterator;
 use std::rc::Rc;
 
 pub struct Config {
@@ -110,6 +110,12 @@ pub struct World {
     config: Config,
 }
 
+struct SnakesInteractionsDetectResult {
+    snakes_to_remove: HashSet<usize>,
+    snakes_that_ate_food: HashMap<usize, Point<AreaSize>>,
+    snakes_that_bit_tail: HashMap<usize, (usize, Point<AreaSize>)>,
+}
+
 impl World {
     pub fn new(config: Config) -> Result<Self, CreateError> {
         if config.world_size.0 < 10 || config.world_size.1 < 10 {
@@ -141,63 +147,61 @@ impl World {
             config,
         })
     }
-    pub fn tick(&mut self, reset: bool) -> WorldView {
-        // Border
-        if reset {
-            let border_points: HashSet<Point<AreaSize>> = {
-                let mut border_points = HashSet::new();
-                for x in 0..self.config.world_size.0 {
-                    for y in 0..self.config.world_size.1 {
-                        let max_x = self.config.world_size.0 - 1;
-                        let max_y = self.config.world_size.1 - 1;
-                        if x == 0 || y == 0 || x == max_x || y == max_y {
-                            border_points.insert(Point::new(x, y));
-                        }
-                    }
-                }
-                border_points
-            };
-            self.border_points = border_points;
-            self.world_mask.set_layer(ObjectType::Border, self.border_points.clone());
-        }
-        // Snakes
-        if reset {
-            let snakes: HashMap<usize, Snake<AreaSize>> = {
-                let mut snakes = HashMap::new();
-                for snake_number in 0..self.config.snakes_controllers.len() as AreaSize {
-                    let real_snake_number = snake_number + 1;
-                    let snake_number = snake_number as usize;
-                    let mut snake = Snake::new(Point::new(3, real_snake_number * 3));
-                    for _ in 0..self.config.base_snake_tail_size {
-                        snake.fill_stomach_if_empty();
-                        snake.move_to(Direction::Right);
-                    }
-                    snakes.insert(snake_number, snake);
-                }
-                snakes
-            };
-            // Snakes: snakes_spawn
-            for (snake_number, snake) in snakes {
-                if let Some(mut controller) = self.config.snake_controller(&snake_number) {
-                    let world_view = WorldView::new(self);
-                    controller.snake_will_burn(&world_view);
-                }
-                let points = HashSet::from_iter(snake.body_parts_points(true).clone());
-                let snake_info = SnakeInfo {
-                    snake,
-                    direction: None,
-                };
-                self.snakes_info.insert(snake_number, snake_info);
-                self.world_mask.set_layer(ObjectType::Snake(snake_number.clone()), points);
-                if let Some(snake_info) = self.snakes_info.get(&snake_number) {
-                    if let Some(mut controller) = self.config.snake_controller(&snake_number) {
-                        let world_view = WorldView::new(self);
-                        controller.snake_did_burn(snake_info, &world_view);
+    fn spawn_border(&mut self) {
+        let border_points: HashSet<Point<AreaSize>> = {
+            let mut border_points = HashSet::new();
+            for x in 0..self.config.world_size.0 {
+                for y in 0..self.config.world_size.1 {
+                    let max_x = self.config.world_size.0 - 1;
+                    let max_y = self.config.world_size.1 - 1;
+                    if x == 0 || y == 0 || x == max_x || y == max_y {
+                        border_points.insert(Point::new(x, y));
                     }
                 }
             }
+            border_points
+        };
+        self.border_points = border_points;
+        self.world_mask
+            .set_layer(ObjectType::Border, self.border_points.clone());
+    }
+    fn spawn_snakes(&mut self) {
+        let snakes: HashMap<usize, Snake<AreaSize>> = {
+            let mut snakes = HashMap::new();
+            for snake_number in 0..self.config.snakes_controllers.len() as AreaSize {
+                let real_snake_number = snake_number + 1;
+                let snake_number = snake_number as usize;
+                let mut snake = Snake::new(Point::new(3, real_snake_number * 3));
+                for _ in 0..self.config.base_snake_tail_size {
+                    snake.fill_stomach_if_empty();
+                    snake.move_to(Direction::Right);
+                }
+                snakes.insert(snake_number, snake);
+            }
+            snakes
+        };
+        for (snake_number, snake) in snakes {
+            if let Some(mut controller) = self.config.snake_controller(&snake_number) {
+                let world_view = WorldView::new(self);
+                controller.snake_will_burn(&world_view);
+            }
+            let points = HashSet::from_iter(snake.body_parts_points(true).clone());
+            let snake_info = SnakeInfo {
+                snake,
+                direction: None,
+            };
+            self.snakes_info.insert(snake_number, snake_info);
+            self.world_mask
+                .set_layer(ObjectType::Snake(snake_number.clone()), points);
+            if let Some(snake_info) = self.snakes_info.get(&snake_number) {
+                if let Some(mut controller) = self.config.snake_controller(&snake_number) {
+                    let world_view = WorldView::new(self);
+                    controller.snake_did_burn(snake_info, &world_view);
+                }
+            }
         }
-        // Snakes: snakes_move
+    }
+    fn snakes_move(&mut self) -> HashMap<Point<AreaSize>, HashSet<Direction>> {
         let mut points_move_vectors = HashMap::<Point<AreaSize>, HashSet<Direction>>::new();
         let snakes_numbers = {
             let mut snakes_numbers = Vec::<usize>::new();
@@ -241,14 +245,20 @@ impl World {
             }
             if let Some(snake_info) = self.snakes_info.get(&snake_number) {
                 let points = HashSet::from_iter(snake_info.snake.body_parts_points(true).clone());
-                self.world_mask.set_layer(ObjectType::Snake(snake_number.clone()), points);
+                self.world_mask
+                    .set_layer(ObjectType::Snake(snake_number.clone()), points);
                 if let Some(mut controller) = self.config.snake_controller(&snake_number) {
                     let world_view = WorldView::new(self);
                     controller.snake_did_move(snake_info, &world_view);
                 }
             }
         }
-        // Snakes: snakes_interactions_detect
+        points_move_vectors
+    }
+    fn snakes_interactions_detect(
+        &mut self,
+        points_move_vectors: &HashMap<Point<AreaSize>, HashSet<Direction>>,
+    ) -> SnakesInteractionsDetectResult {
         let mut snakes_to_remove = HashSet::<usize>::new();
         let mut snakes_that_ate_food = HashMap::<usize, Point<AreaSize>>::new();
         let mut snakes_that_bit_tail = HashMap::<usize, (usize, Point<AreaSize>)>::new();
@@ -279,35 +289,47 @@ impl World {
                 }
                 for object in self.world_mask.point_occurrences(&body_point) {
                     match object {
-                        ObjectType::Snake(number) => if number != *snake_number {
-                            if self.config.cut_tails {
-                                if let Some(other_snake_info) = self.snakes_info.get(&number) {
-                                    if other_snake_info.snake.head_point() == head_point {
-                                        snakes_to_remove.insert(snake_number.clone());
-                                        continue;
+                        ObjectType::Snake(number) => {
+                            if number != *snake_number {
+                                if self.config.cut_tails {
+                                    if let Some(other_snake_info) = self.snakes_info.get(&number) {
+                                        if other_snake_info.snake.head_point() == head_point {
+                                            snakes_to_remove.insert(snake_number.clone());
+                                            continue;
+                                        }
                                     }
+                                    if body_point == head_point {
+                                        let tail_info = (number.clone(), body_point.clone());
+                                        snakes_that_bit_tail
+                                            .insert(snake_number.clone(), tail_info);
+                                    }
+                                } else {
+                                    snakes_to_remove.insert(snake_number.clone());
                                 }
-                                if body_point == head_point {
-                                    let tail_info = (number.clone(), body_point.clone());
-                                    snakes_that_bit_tail.insert(snake_number.clone(), tail_info);
-                                }
+                            }
+                        }
+                        ObjectType::Eat => {
+                            if body_point == head_point {
+                                snakes_that_ate_food
+                                    .insert(snake_number.clone(), body_point.clone());
                             } else {
                                 snakes_to_remove.insert(snake_number.clone());
                             }
-                        },
-                        ObjectType::Eat => if body_point == head_point {
-                            snakes_that_ate_food.insert(snake_number.clone(), body_point.clone());
-                        } else {
-                            snakes_to_remove.insert(snake_number.clone());
-                        },
+                        }
                         ObjectType::Border => {
                             snakes_to_remove.insert(snake_number.clone());
-                        },
+                        }
                     }
                 }
             }
         }
-        // Snakes: snakes_remove
+        SnakesInteractionsDetectResult {
+            snakes_to_remove,
+            snakes_that_ate_food,
+            snakes_that_bit_tail,
+        }
+    }
+    fn handle_snakes_to_remove(&mut self, snakes_to_remove: HashSet<usize>) {
         for snake_remove_number in snakes_to_remove {
             if let Some(to_remove_snake_info) = self.snakes_info.get(&snake_remove_number) {
                 if let Some(mut controller) = self.config.snake_controller(&snake_remove_number) {
@@ -316,13 +338,18 @@ impl World {
                 }
             }
             self.snakes_info.remove(&snake_remove_number);
-            self.world_mask.remove_layer(&ObjectType::Snake(snake_remove_number));
+            self.world_mask
+                .remove_layer(&ObjectType::Snake(snake_remove_number));
             if let Some(mut controller) = self.config.snake_controller(&snake_remove_number) {
                 let world_view = WorldView::new(self);
                 controller.snake_did_died(&world_view);
             }
         }
-        // Snakes: snakes_bit_tail
+    }
+    fn handle_snakes_that_bit_tail(
+        &mut self,
+        snakes_that_bit_tail: HashMap<usize, (usize, Point<AreaSize>)>,
+    ) {
         for (snake, (cut_snake, body_point)) in snakes_that_bit_tail {
             if let Some(snake_info) = self.snakes_info.get(&snake) {
                 if let Some(mut controller) = self.config.snake_controller(&snake) {
@@ -334,10 +361,13 @@ impl World {
                 snake_info.snake.fill_stomach_if_empty();
             }
             if let Some(cut_snake_info) = self.snakes_info.get_mut(&cut_snake) {
-                cut_snake_info.snake.recursive_remove_tail(|p| p == body_point);
+                cut_snake_info
+                    .snake
+                    .recursive_remove_tail(|p| p == body_point);
                 let body_points = cut_snake_info.snake.body_parts_points(true).clone();
                 let points = HashSet::from_iter(body_points);
-                self.world_mask.set_layer(ObjectType::Snake(cut_snake.clone()), points);
+                self.world_mask
+                    .set_layer(ObjectType::Snake(cut_snake.clone()), points);
             }
             if let Some(snake_info) = self.snakes_info.get(&snake) {
                 if let Some(mut controller) = self.config.snake_controller(&snake) {
@@ -346,7 +376,11 @@ impl World {
                 }
             }
         }
-        // Snakes: snakes_feeding
+    }
+    fn handle_snakes_that_ate_food(
+        &mut self,
+        snakes_that_ate_food: HashMap<usize, Point<AreaSize>>,
+    ) {
         for (snakes_feeding, eat_point) in snakes_that_ate_food {
             if let Some(snake_info) = self.snakes_info.get(&snakes_feeding) {
                 if let Some(mut controller) = self.config.snake_controller(&snakes_feeding) {
@@ -357,7 +391,8 @@ impl World {
             if let Some(snake_info) = self.snakes_info.get_mut(&snakes_feeding) {
                 snake_info.snake.fill_stomach_if_empty();
                 if self.eat_points.remove(&eat_point) {
-                    self.world_mask.set_layer(ObjectType::Eat, self.eat_points.clone());
+                    self.world_mask
+                        .set_layer(ObjectType::Eat, self.eat_points.clone());
                 }
             }
             if let Some(snake_info) = self.snakes_info.get(&snakes_feeding) {
@@ -367,7 +402,8 @@ impl World {
                 }
             }
         }
-        // Eat
+    }
+    fn spawn_eat(&mut self) {
         let eat_to_spawn = self.config.eat_count - self.eat_points.len() as AreaSize;
         unsafe {
             let _ = set_rand_current_time_seed();
@@ -385,8 +421,24 @@ impl World {
                 }
             }
         }
-        self.world_mask.set_layer(ObjectType::Eat, self.eat_points.clone());
-        // Other
+        self.world_mask
+            .set_layer(ObjectType::Eat, self.eat_points.clone());
+    }
+    pub fn tick(&mut self, reset: bool) -> WorldView {
+        if reset {
+            self.spawn_border();
+            self.spawn_snakes()
+        }
+        let points_move_vectors = self.snakes_move();
+        let SnakesInteractionsDetectResult {
+            snakes_to_remove,
+            snakes_that_ate_food,
+            snakes_that_bit_tail,
+        } = self.snakes_interactions_detect(&points_move_vectors);
+        self.handle_snakes_to_remove(snakes_to_remove);
+        self.handle_snakes_that_bit_tail(snakes_that_bit_tail);
+        self.handle_snakes_that_ate_food(snakes_that_ate_food);
+        self.spawn_eat();
         WorldView::new(self)
     }
 }

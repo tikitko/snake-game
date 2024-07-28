@@ -1,5 +1,5 @@
-use std::os::raw::{c_uint, c_int};
-use std::time::{UNIX_EPOCH, SystemTime, SystemTimeError};
+use std::os::raw::{c_int, c_uint};
+use std::time::{SystemTime, SystemTimeError, UNIX_EPOCH};
 
 extern "C" {
     fn srand(seed: c_uint);
@@ -17,9 +17,7 @@ pub unsafe fn get_rand_in_range(a: c_int, b: c_int) -> c_int {
 }
 
 pub unsafe fn set_rand_current_time_seed() -> Result<(), SystemTimeError> {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)?
-        .subsec_nanos();
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.subsec_nanos();
     srand(nanos);
     Ok(())
 }
